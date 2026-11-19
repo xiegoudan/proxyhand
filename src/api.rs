@@ -23,6 +23,7 @@ use tokio_tungstenite::tungstenite::protocol::{Message, Role};
 use crate::ca::Ca;
 use crate::har;
 use crate::i18n::{self, Lang};
+use crate::replay;
 use crate::store::{Kind, ListQuery, Order, ServerEvent, StatusFilter, Store};
 use crate::util::{host_is_local, host_matches};
 
@@ -99,6 +100,27 @@ impl Ui {
             (Method::DELETE, "/api/flows") => {
                 self.store.clear();
                 json_ok(json!({ "ok": true }))
+            }
+            (Method::POST, "/api/replay") => {
+                let body = req
+                    .into_body()
+                    .collect()
+                    .await
+                    .map(|c| c.to_bytes())
+                    .unwrap_or_default();
+                if self.store.is_paused() {
+                    return error(StatusCode::CONFLICT, i18n::replay_paused(lang));
+                }
+                let parsed = serde_json::from_slice::<Value>(&body)
+                    .map_err(|e| e.to_string())
+                    .and_then(|value| replay::Replay::parse(&value));
+                match parsed {
+                    Ok(replay) => match replay::send(self.store.clone(), self.port, replay).await {
+                        Ok(id) => json_ok(json!({ "id": id })),
+                        Err(e) => error(StatusCode::BAD_GATEWAY, i18n::replay_failed(lang, &e)),
+                    },
+                    Err(e) => error(StatusCode::BAD_REQUEST, i18n::replay_failed(lang, &e)),
+                }
             }
             (Method::POST, "/api/pause") => {
                 let body = req

@@ -389,6 +389,11 @@ impl Store {
         inner.flows.get(&id).cloned()
     }
 
+    /// Highest id handed out so far, so callers can watch for the next flow.
+    pub fn last_id(&self) -> u64 {
+        self.lock().next_id - 1
+    }
+
     pub fn get(&self, id: u64) -> Option<Flow> {
         let inner = self.lock();
         Self::get_from_inner(&inner, id)

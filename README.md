@@ -28,6 +28,7 @@ English | [简体中文](README.zh-CN.md)
 | --- | --- |
 | ![flow list](docs/ui-overview.png) | ![SSE frames](docs/ui-sse.png) |
 | ![request body](docs/ui-request.png) | ![websocket frames](docs/ui-ws.png) |
+| ![form body](docs/ui-form.png) | ![replay](docs/ui-replay.png) |
 
 ## Quick start
 
@@ -216,10 +217,14 @@ proxy:
 - **Request / Response**: headers with filter, bodies as a line-numbered JSON tree (Yaak-style: collapsed branches,
   syntax colours, wrapped long values) that starts fully expanded (or raw), one click to copy the whole body,
   gzip/br/deflate decoded on the fly, binary bodies downloadable, truncation flagged.
+- **Form bodies** (`application/x-www-form-urlencoded`, `multipart/form-data`) as a field table instead of raw text —
+  file parts keep their name, content type and size, and every field can be copied with one click.
 - **SSE**: every event individually — `event:`, `id:`, `retry:`, comments, byte size, arrival offset, JSON payload in
   a tree, follow-tail toggle, frame filter.
 - **WS**: both directions interleaved with `↑` / `↓`, opcode (text/binary/ping/pong/close), fragmentation and
   truncation flags, JSON payload tree.
+- **Replay** any request: edit the method, URL, headers and body in a dialog and send it again through the proxy
+  (same TLS path, same capture). The new flow appears in the list and is selected for you.
 - **Copy cURL** for any flow, **HAR export** for one flow or everything, **pause / clear** capture — clearing
   drops the finished flows and leaves the streams that are still open.
 - **English / 简体中文** switch in the header (`?lang=`), remembered in `localStorage`.

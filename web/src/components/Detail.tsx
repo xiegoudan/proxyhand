@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Copy, Download, FileJson, Terminal } from 'lucide-react';
+import { ArrowDown, ArrowUp, Copy, Download, FileJson, Repeat, Terminal } from 'lucide-react';
 import type { BodyView, Flow, HeaderPair, SseFrame, WsFrame } from '../../../shared/protocol.ts';
 import { useI18n } from '../i18n.tsx';
 import {
@@ -15,11 +15,14 @@ import {
   tryJson,
 } from '../lib/format.ts';
 import { JsonTree } from './JsonTree.tsx';
+import { FormTable, parseForm } from './FormView.tsx';
+import { ReplayDialog } from './ReplayDialog.tsx';
 
 interface Props {
   flow: Flow;
   sse: SseFrame[];
   ws: WsFrame[];
+  onReplayed: (id: number) => void;
 }
 
 type Tab = 'overview' | 'request' | 'response' | 'frames';
@@ -30,10 +33,11 @@ const TABS: { id: Tab; key: string }[] = [
   { id: 'frames', key: 'detail.tabs.frames' },
 ];
 
-export function Detail({ flow, sse, ws }: Props) {
+export function Detail({ flow, sse, ws, onReplayed }: Props) {
   const { t } = useI18n();
   const [tab, setTab] = useState<Tab>('overview');
   const [copied, setCopied] = useState(false);
+  const [replayOpen, setReplayOpen] = useState(false);
 
   useEffect(() => {
     setTab(flow.kind === 'sse' || flow.kind === 'ws' ? 'frames' : 'overview');
@@ -59,6 +63,9 @@ export function Detail({ flow, sse, ws }: Props) {
           </span>
         </div>
         <div className="detail-actions">
+          <button type="button" className="ghost" onClick={() => setReplayOpen(true)}>
+            <Repeat size={13} /> {t('detail.replay')}
+          </button>
           <button type="button" className="ghost" onClick={onCopyCurl}>
             <Terminal size={13} /> {copied ? t('detail.copied') : t('detail.copyCurl')}
           </button>
@@ -75,6 +82,10 @@ export function Detail({ flow, sse, ws }: Props) {
           {flow.open && <span className="live-dot">{t('detail.streaming')}</span>}
         </div>
       </header>
+
+      {replayOpen && (
+        <ReplayDialog flow={flow} onClose={() => setReplayOpen(false)} onSent={onReplayed} />
+      )}
 
       {flow.notes?.length ? (
         <div className="notes">
@@ -228,10 +239,11 @@ function HeadersTable({ title, headers, tint }: { title: string; headers: Header
 
 function BodyBlock({ label, file, body }: { label: string; file: string; body: BodyView | undefined }) {
   const { t } = useI18n();
-  const [mode, setMode] = useState<'pretty' | 'raw'>('pretty');
+  const [mode, setMode] = useState<'pretty' | 'form' | 'raw'>('pretty');
   const [copied, setCopied] = useState(false);
   const text = body?.text ?? null;
   const json = useMemo(() => tryJson(text), [text]);
+  const form = useMemo(() => parseForm(body?.mime, text), [body?.mime, text]);
   const copy = async () => {
     if (!body) return;
     // A binary body has no text to copy, so the base64 payload is what the clipboard gets.
@@ -261,11 +273,18 @@ function BodyBlock({ label, file, body }: { label: string; file: string; body: B
           {fmtBytes(body.size)}
           {body.decodedSize !== undefined && body.encoding ? ` · ${body.encoding} → ${fmtBytes(body.decodedSize)}` : ''}
         </span>
-        {json !== undefined && (
+        {(json !== undefined || form !== undefined) && (
           <div className="segmented">
-            <button type="button" className={mode === 'pretty' ? 'is-active' : ''} onClick={() => setMode('pretty')}>
-              {t('detail.tree')}
-            </button>
+            {json !== undefined && (
+              <button type="button" className={mode === 'pretty' ? 'is-active' : ''} onClick={() => setMode('pretty')}>
+                {t('detail.tree')}
+              </button>
+            )}
+            {form !== undefined && (
+              <button type="button" className={mode === 'form' ? 'is-active' : ''} onClick={() => setMode('form')}>
+                {t('detail.form')}
+              </button>
+            )}
             <button type="button" className={mode === 'raw' ? 'is-active' : ''} onClick={() => setMode('raw')}>
               {t('detail.raw')}
             </button>
@@ -291,6 +310,8 @@ function BodyBlock({ label, file, body }: { label: string; file: string; body: B
         </div>
       ) : text === '' ? (
         <div className="hint">{t('detail.emptyBody')}</div>
+      ) : form !== undefined && (mode === 'form' || (json === undefined && mode === 'pretty')) ? (
+        <FormTable fields={form.fields} />
       ) : json !== undefined && mode === 'pretty' ? (
         <JsonTree data={json} />
       ) : (

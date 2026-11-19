@@ -5,8 +5,9 @@ mod common;
 use std::time::{Duration, Instant};
 
 use common::{
-    api_get, api_get_json, connect, https_get_via_proxy, proxy_get, read_response_head, request,
-    start_http_upstream, start_https_upstream, start_proxy, wait_for_flow,
+    api_get, api_get_json, api_post_json, connect, https_get_via_proxy, proxy_get,
+    read_response_head, request, start_http_upstream, start_https_upstream, start_proxy,
+    wait_for_flow,
 };
 use serde_json::Value;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -545,4 +546,71 @@ async fn clearing_keeps_the_streams_that_are_still_open() {
     assert_eq!(body["total"], 1);
 
     drop(client);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn replay_edits_and_resends_a_request_through_the_proxy() {
+    let proxy = start_proxy(true, &[], true).await;
+    let upstream = start_http_upstream().await;
+    let url = format!("http://{}/echo", upstream.addr);
+
+    let (status, value) = api_post_json(
+        proxy.addr,
+        "/api/replay",
+        &serde_json::json!({
+            "method": "POST",
+            "url": url,
+            "headers": [["content-type", "application/json"], ["x-replayed", "yes"]],
+            "body": "{\"from\":\"replay\"}",
+        }),
+    )
+    .await;
+    assert_eq!(status, 200, "replay failed: {value}");
+    let id = value["id"].as_u64().expect("flow id");
+
+    let detail = wait_for_flow(proxy.addr, id, |flow| flow["endedAt"].is_number()).await;
+    assert_eq!(detail["method"], "POST");
+    assert_eq!(detail["status"], 200);
+    assert_eq!(detail["reqBody"]["text"], "{\"from\":\"replay\"}");
+    assert_eq!(
+        find_header(&detail["reqHeaders"], "x-replayed"),
+        Some("yes")
+    );
+    // The upstream echoes what it saw, so the bytes really travelled.
+    assert!(
+        body_text(&detail).is_some_and(|body| body.contains("from")),
+        "upstream echo was captured: {detail}"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn replay_rejects_a_relative_url() {
+    let proxy = start_proxy(true, &[], true).await;
+    let (status, value) = api_post_json(
+        proxy.addr,
+        "/api/replay",
+        &serde_json::json!({ "method": "GET", "url": "/relative" }),
+    )
+    .await;
+    assert_eq!(status, 400, "body: {value}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn replay_refuses_while_capture_is_paused() {
+    let proxy = start_proxy(true, &[], true).await;
+    let upstream = start_http_upstream().await;
+    let (status, _) = api_post_json(
+        proxy.addr,
+        "/api/pause",
+        &serde_json::json!({ "paused": true }),
+    )
+    .await;
+    assert_eq!(status, 200);
+    let (status, value) = api_post_json(
+        proxy.addr,
+        "/api/replay",
+        &serde_json::json!({ "method": "GET", "url": format!("http://{}/hello", upstream.addr) }),
+    )
+    .await;
+    assert_eq!(status, 409, "body: {value}");
 }

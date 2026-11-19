@@ -184,7 +184,15 @@ export function App() {
         <FlowList flows={flows} selectedId={selectedId} onSelect={select} order={order} onToggleOrder={toggleOrder} />
         <div className="detail-slot">
           {detail ? (
-            <Detail flow={detail} sse={capture.selectedSse} ws={capture.selectedWs} />
+            <Detail
+              flow={detail}
+              sse={capture.selectedSse}
+              ws={capture.selectedWs}
+              onReplayed={(id) => {
+                capture.refresh();
+                capture.select(id);
+              }}
+            />
           ) : (
             <div className="detail-placeholder">
               <div className="placeholder-art">

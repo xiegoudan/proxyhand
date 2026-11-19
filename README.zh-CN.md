@@ -28,6 +28,7 @@
 | --- | --- |
 | ![记录列表](docs/ui-overview.png) | ![SSE 事件流](docs/ui-sse.png) |
 | ![请求体](docs/ui-request.png) | ![WebSocket 帧](docs/ui-ws.png) |
+| ![表单正文](docs/ui-form.png) | ![重放请求](docs/ui-replay.png) |
 
 ## 快速开始
 
@@ -208,10 +209,14 @@ proxy:
 - **概览**：耗时（TTFB 与接收分别计）、字节数、ALPN、代理备注、两边的头表。
 - **请求 / 响应**：头部可过滤，正文默认展开成带行号的 JSON 树（Yaak 风格：可折叠分支、语法着色、长值自动换行），
   也可切原始文本；一键复制整段正文，gzip/br/deflate 即时解压，二进制正文可下载，截断会被标注。
+- **表单正文**（`application/x-www-form-urlencoded`、`multipart/form-data`）按字段表格展示，不再是一坨原始文本；
+  文件部分会带上文件名、内容类型和大小，每个字段都能一键复制。
 - **SSE**：逐条事件 —— `event:`、`id:`、`retry:`、注释、字节大小、到达偏移、JSON 负载树、
   跟随尾部开关、帧过滤。
 - **WS**：两个方向用 `↑` / `↓` 交错排列，opcode（text/binary/ping/pong/close）、分片与截断
   标记、JSON 负载树。
+- 任意请求都能 **重放**：在弹窗里改方法、URL、请求头和正文，再经代理发出去（走同样的 TLS 路径、同样会被记录），
+  新流会出现在列表里并自动选中。
 - 任意流都能 **复制 cURL**，单个流或全部都能 **导出 HAR**，抓包可以 **暂停 / 清空**（清空只移除已结束的流，
   还在进行的 SSE / WebSocket 会保留）。
 - 顶栏的 **English / 简体中文** 切换（`?lang=`），记在 `localStorage` 里。

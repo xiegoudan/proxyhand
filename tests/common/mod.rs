@@ -529,6 +529,22 @@ pub async fn api_get_json(proxy: SocketAddr, path: &str) -> (u16, Value) {
     (response.status, value)
 }
 
+/// POST a JSON body to one of the UI endpoints.
+pub async fn api_post_json(proxy: SocketAddr, path: &str, body: &Value) -> (u16, Value) {
+    let host = proxy.to_string();
+    let payload = serde_json::to_vec(body).expect("encode json body");
+    let response = request(
+        proxy,
+        "POST",
+        path,
+        &host,
+        &[("content-type", "application/json")],
+        &payload,
+    )
+    .await;
+    (response.status, response.json())
+}
+
 /// Poll `/api/flows/{id}` until `accept` returns true.
 pub async fn wait_for_flow<F>(proxy: SocketAddr, id: u64, mut accept: F) -> Value
 where

@@ -369,3 +369,43 @@ fn build_body_edge_cases() {
     assert_eq!(html.mime, None);
     assert!(html.text.is_some(), "HTML should be treated as textual");
 }
+
+#[test]
+fn multipart_form_bodies_stay_text_so_the_ui_can_split_fields() {
+    let body = concat!(
+        "--XyZ\r\n",
+        "Content-Disposition: form-data; name=\"name\"\r\n\r\n",
+        "widget\r\n",
+        "--XyZ--\r\n"
+    );
+    let view = build_body(
+        &[body.as_bytes().to_vec()],
+        body.len() as u64,
+        0,
+        Some("multipart/form-data; boundary=XyZ"),
+        None,
+        1 << 20,
+    )
+    .expect("body view");
+    assert_eq!(
+        view.text.as_deref(),
+        Some(body),
+        "multipart must stay readable"
+    );
+    assert!(view.base64.is_none());
+
+    let binary = build_body(
+        &[vec![0xff, 0x00, 0xfe]],
+        3,
+        0,
+        Some("multipart/form-data; boundary=XyZ"),
+        None,
+        1 << 20,
+    )
+    .expect("body view");
+    assert!(
+        binary.text.is_none(),
+        "non-utf8 multipart falls back to base64"
+    );
+    assert!(binary.base64.is_some());
+}

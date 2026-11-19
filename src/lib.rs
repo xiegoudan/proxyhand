@@ -8,6 +8,7 @@ pub mod ca;
 pub mod har;
 pub mod i18n;
 pub mod proxy;
+pub mod replay;
 pub mod sse;
 pub mod store;
 pub mod tls;

@@ -340,6 +340,20 @@ pub fn body_too_large(lang: Lang, limit: usize) -> String {
     }
 }
 
+pub fn replay_paused(lang: Lang) -> String {
+    match lang {
+        Lang::En => "proxyhand: capture is paused, so the replay would not be recorded".to_string(),
+        Lang::Zh => "proxyhand: 抓包处于暂停状态，重放的请求不会被记录".to_string(),
+    }
+}
+
+pub fn replay_failed(lang: Lang, err: &str) -> String {
+    match lang {
+        Lang::En => format!("proxyhand: replay failed: {err}"),
+        Lang::Zh => format!("proxyhand: 重放失败：{err}"),
+    }
+}
+
 pub fn cannot_read_ca(lang: Lang, file: &str, err: &str) -> String {
     match lang {
         Lang::En => format!("cannot read --upstream-ca \"{file}\": {err}"),

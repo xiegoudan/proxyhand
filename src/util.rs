@@ -130,6 +130,7 @@ fn looks_textual(content_type: Option<&str>, body: &[u8]) -> bool {
             || ct.contains("xml")
             || ct.contains("graphql")
             || ct.contains("x-www-form-urlencoded")
+            || ct.starts_with("multipart/form-data") && std::str::from_utf8(body).is_ok()
             || ct.contains("event-stream")
         {
             return true;
