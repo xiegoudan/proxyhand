@@ -1,0 +1,28 @@
+# Runtime-only image built from the released static executables.
+#
+# One `docker buildx build --platform linux/amd64,linux/arm64` produces a single
+# multi-architecture tag: BuildKit sets TARGETARCH for each platform and the
+# matching `proxyhand-<arch>-linux` file is copied in. Nothing is compiled here,
+# so the image holds exactly the bytes users download and no Rust runs under
+# QEMU.
+#
+#   docker buildx build --platform linux/amd64,linux/arm64 \
+#     -f Dockerfile.runtime -t proxyhand .
+#
+# The binaries come from the GitHub release (the release workflow downloads the
+# build artifacts into ./ first). Use the multi-stage ./Dockerfile instead when
+# you want to build everything from source.
+FROM alpine:3.20
+
+# amd64 or arm64 — identical to the suffix in the release asset names.
+ARG TARGETARCH
+COPY proxyhand-${TARGETARCH}-linux /usr/local/bin/proxyhand
+
+RUN chmod 0755 /usr/local/bin/proxyhand \
+ && apk add --no-cache ca-certificates \
+ && mkdir -p /data
+
+VOLUME ["/data"]
+EXPOSE 7747
+
+ENTRYPOINT ["proxyhand", "--port", "7747", "--host", "0.0.0.0", "--dir", "/data", "--self-hosts", "proxy"]

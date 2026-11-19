@@ -1,0 +1,298 @@
+name: release
+
+# Cuts a release for every v* tag. Asset names spell out the platform and the
+# architecture in plain words: proxyhand-<amd64|arm64>-<windows|linux|macos>.
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  build:
+    name: build ${{ matrix.asset }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Linux: statically linked, so one file works on every distribution
+          # (Alpine, old glibc, systemd-only images, ...).
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            kind: linux
+            arch: amd64
+            asset: proxyhand-amd64-linux
+            cross: true
+            smoke: true
+          - target: aarch64-unknown-linux-musl
+            os: ubuntu-latest
+            kind: linux
+            arch: arm64
+            asset: proxyhand-arm64-linux
+            cross: true
+          # Windows
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            kind: windows
+            arch: amd64
+            asset: proxyhand-amd64-windows.exe
+            smoke: true
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+            kind: windows
+            arch: arm64
+            asset: proxyhand-arm64-windows.exe
+          # macOS
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            kind: macos
+            arch: arm64
+            asset: proxyhand-arm64-macos
+            smoke: true
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            kind: macos
+            arch: amd64
+            asset: proxyhand-amd64-macos
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      # The web UI is committed as a single-file bundle and embedded by build.rs;
+      # fail loudly instead of shipping a binary without a UI.
+      - name: Check the embedded web UI is present
+        shell: bash
+        run: test -s web/dist/index.html || { echo "web/dist/index.html is missing or empty"; exit 1; }
+
+      - name: Verify the tag matches Cargo.toml
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: bash
+        run: |
+          cargo_version=$(grep -m1 '^version' Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')
+          test "v${cargo_version}" = "${GITHUB_REF_NAME}" || {
+            echo "tag ${GITHUB_REF_NAME} does not match Cargo.toml version ${cargo_version}"
+            exit 1
+          }
+
+      - name: Install cross
+        if: matrix.cross
+        uses: taiki-e/install-action@cross
+
+      - name: Build (cross)
+        if: matrix.cross
+        run: cross build --release --locked --target ${{ matrix.target }}
+
+      - name: Build (cargo)
+        if: ${{ !matrix.cross }}
+        run: cargo build --release --locked --target ${{ matrix.target }}
+
+      - name: Smoke test
+        if: matrix.smoke
+        shell: bash
+        run: |
+          bin="target/${{ matrix.target }}/release/proxyhand"
+          [ -f "${bin}.exe" ] && bin="${bin}.exe"
+          "${bin}" --version
+
+      # ---- Stage the executable under its human-readable name ----------------
+      - name: Stage the executable
+        if: matrix.kind != 'windows'
+        shell: bash
+        run: |
+          mkdir -p dist
+          install -m 0755 "target/${{ matrix.target }}/release/proxyhand" \
+            "dist/${{ matrix.asset }}"
+
+      - name: Stage the executable (Windows)
+        if: matrix.kind == 'windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/proxyhand.exe" `
+            "dist/${{ matrix.asset }}"
+
+      # ---- Linux also gets native packages for Debian and Red Hat families ---
+      - name: Build .deb and .rpm (nfpm)
+        if: matrix.kind == 'linux'
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          version="${REF_NAME#v}"
+          curl -fsSL -o nfpm.tgz \
+            "https://github.com/goreleaser/nfpm/releases/download/v2.38.0/nfpm_2.38.0_Linux_x86_64.tar.gz"
+          tar -xzf nfpm.tgz nfpm
+          cp "target/${{ matrix.target }}/release/proxyhand" proxyhand
+          cat > nfpm.yaml <<EOF
+          name: proxyhand
+          arch: ${ARCH}
+          platform: linux
+          version: ${version}
+          section: net
+          priority: optional
+          maintainer: xiegoudan <bool.xie@outlook.com>
+          vendor: proxyhand
+          homepage: https://github.com/xiegoudan/proxyhand
+          license: Apache-2.0
+          description: |
+            HTTP / HTTPS / SSE / WebSocket capture proxy with a built-in web UI.
+            Decrypts TLS with its own root CA, records every request and response,
+            and streams SSE and WebSocket frames into the browser in real time.
+          contents:
+            - src: ./proxyhand
+              dst: /usr/bin/proxyhand
+              file_info:
+                mode: 0755
+            - src: ./LICENSE
+              dst: /usr/share/doc/proxyhand/LICENSE
+          EOF
+          ./nfpm package -f nfpm.yaml -p deb -t "proxyhand-${version}-${ARCH}.deb"
+          ./nfpm package -f nfpm.yaml -p rpm -t "proxyhand-${version}-${ARCH}.rpm"
+          mv proxyhand-*.deb proxyhand-*.rpm dist/
+
+      - name: List assets
+        shell: bash
+        run: ls -l dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS
+        shell: bash
+        working-directory: artifacts
+        run: |
+          ls -l
+          sha256sum * > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/*
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+
+  # Publishes the same binaries as a multi-architecture image. Nothing is
+  # compiled here: Dockerfile.runtime copies the released static executable, so
+  # the image holds exactly the bytes users can download, and no Rust code runs
+  # under QEMU.
+  docker:
+    name: publish docker image
+    needs: build
+    # Tags publish automatically; workflow_dispatch lets you (re)publish the
+    # image for the Cargo.toml version without cutting a new tag.
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve the version
+        id: version
+        shell: bash
+        run: |
+          if [ "${GITHUB_REF_TYPE}" = "tag" ]; then
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+          else
+            v=$(grep -m1 '^version' Cargo.toml | sed -E 's/.*"([^"]+)".*/\1/')
+            echo "version=${v}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Are Docker Hub credentials configured?
+        id: creds
+        shell: bash
+        env:
+          TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          if [ -z "${TOKEN}" ]; then
+            echo "DOCKERHUB_TOKEN is not set — skipping the Docker Hub push." >> "$GITHUB_STEP_SUMMARY"
+            echo "push=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "push=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Download the release binaries
+        if: steps.creds.outputs.push == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - uses: docker/setup-qemu-action@v3
+        if: steps.creds.outputs.push == 'true'
+
+      - uses: docker/setup-buildx-action@v3
+        if: steps.creds.outputs.push == 'true'
+
+      - name: Log in to Docker Hub
+        if: steps.creds.outputs.push == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Stage the binaries for the image build
+        if: steps.creds.outputs.push == 'true'
+        shell: bash
+        # Dockerfile.runtime COPYs from the build context root, while
+        # download-artifact drops everything into dist/.
+        run: install -m 0755 dist/proxyhand-amd64-linux dist/proxyhand-arm64-linux .
+
+      - name: Build and push the multi-architecture image
+        if: steps.creds.outputs.push == 'true'
+        shell: bash
+        env:
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/proxyhand
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          v="${VERSION}"
+          # One build, one tag: buildx assembles the linux/amd64 + linux/arm64
+          # manifest list itself, and TARGETARCH picks the matching binary.
+          docker buildx build --push --provenance=false \
+            --platform linux/amd64,linux/arm64 \
+            -f Dockerfile.runtime \
+            -t "${IMAGE}:${v}" \
+            -t "${IMAGE}:latest" .
+          docker buildx imagetools inspect "${IMAGE}:${v}"
+
+      - name: Smoke test the published image
+        if: steps.creds.outputs.push == 'true'
+        shell: bash
+        env:
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/proxyhand
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          v="${VERSION}"
+          docker pull --platform linux/amd64 "${IMAGE}:${v}"
+          docker run --rm --platform linux/amd64 "${IMAGE}:${v}" --version
+          echo "published \`${IMAGE}:${v}\` and \`${IMAGE}:latest\`" >> "$GITHUB_STEP_SUMMARY"
