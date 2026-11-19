@@ -992,81 +992,102 @@ kbd {
 }
 
 /* ---------------------------------------------------------------- json */
+/* Yaak-style view: one row per line, a sticky line-number gutter, and syntax
+   colours. Long values wrap inside the row so the number stays on one line. */
 .json {
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  background: var(--bg);
-  padding: 8px 10px;
+  background: var(--bg-elev);
   font-family: var(--mono);
-  font-size: 11.5px;
-  line-height: 1.5;
+  font-size: 12.5px;
+  line-height: 1.62;
   overflow: auto;
   max-height: 460px;
+  padding: 6px 0;
 }
 
-.j-row {
+.jv-line {
+  display: flex;
+  align-items: flex-start;
+  min-height: 20px;
+}
+
+.jv-line:hover {
+  background: rgba(15, 23, 42, 0.035);
+}
+
+.jv-ln {
+  flex: 0 0 44px;
+  padding-right: 10px;
+  text-align: right;
+  font-size: 11px;
+  line-height: 20.5px;
+  color: #bcc5d1;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.jv-text {
+  position: relative;
+  flex: 1 1 auto;
+  padding-right: 14px;
   white-space: pre-wrap;
-  word-break: break-word;
+  word-break: break-all;
+  color: var(--text);
 }
 
-.j-children {
-  padding-left: 15px;
-  border-left: 1px solid rgba(15, 23, 42, 0.08);
-  margin-left: 3px;
-}
-
-.j-toggle {
+.jv-caret {
+  position: absolute;
+  top: 4px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 13px;
+  width: 15px;
   height: 13px;
   padding: 0;
   color: var(--text-faint);
-  vertical-align: middle;
 }
 
-.j-toggle svg {
-  display: block;
-}
-
-.j-toggle:hover {
+.jv-caret:hover {
   color: var(--accent);
 }
 
-.j-key {
-  color: var(--blue);
-}
-
-.j-colon {
-  color: var(--text-faint);
-}
-
-.j-str {
-  color: var(--accent);
-}
-
-.j-num {
-  color: var(--amber);
-}
-
-.j-bool {
+.jv-key {
   color: var(--violet);
 }
 
-.j-null {
+.jv-punct {
+  color: var(--text-faint);
+}
+
+.jv-str {
+  color: var(--green);
+}
+
+.jv-num {
+  color: var(--amber);
+}
+
+.jv-bool {
+  color: var(--blue);
+}
+
+.jv-null {
   color: var(--text-faint);
   font-style: italic;
 }
 
-.j-brace {
+.jv-summary {
   color: var(--text-faint);
+  font-size: 11px;
+  font-style: italic;
+  padding: 0 5px;
 }
 
-.j-summary {
+.jv-hidden {
+  padding: 4px 12px 2px 58px;
+  font-size: 11px;
   color: var(--text-faint);
-  font-size: 10.5px;
-  padding: 0 5px;
   font-style: italic;
 }
 
@@ -1154,7 +1175,6 @@ kbd {
 }
 
 .sse-data .json {
-  background: rgba(15, 23, 42, 0.06);
   border-color: rgba(15, 23, 42, 0.1);
   max-height: 300px;
 }
@@ -1224,7 +1244,6 @@ kbd {
 }
 
 .ws-body .json {
-  background: rgba(15, 23, 42, 0.06);
   max-height: 240px;
 }
 

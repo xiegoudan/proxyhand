@@ -155,6 +155,7 @@ const en = {
     toggle: 'toggle',
     items: '{count} items',
     keys: '{count} keys',
+    hidden: '… {count} more lines — switch to Raw to see the whole body',
   },
 } as const;
 
@@ -307,6 +308,7 @@ const zh: Dict = {
     toggle: '展开或折叠',
     items: '{count} 项',
     keys: '{count} 个键',
+    hidden: '… 还有 {count} 行，切到「原始」看完整内容',
   },
 };
 

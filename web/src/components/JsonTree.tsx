@@ -1,130 +1,149 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useI18n } from '../i18n.tsx';
 
 interface Props {
   data: unknown;
-  /** depth to expand by default; everything is open unless a caller asks otherwise */
-  openDepth?: number;
 }
 
-export function JsonTree({ data, openDepth = Number.POSITIVE_INFINITY }: Props) {
+/** One rendered line of the tree. Collapsed branches simply stop producing lines. */
+type Line =
+  | { kind: 'open'; depth: number; path: string; key?: string; bracket: '[' | '{'; count: number; open: boolean; last: boolean }
+  | { kind: 'close'; depth: number; bracket: ']' | '}'; last: boolean }
+  | { kind: 'leaf'; depth: number; key?: string; value: unknown; last: boolean };
+
+const INDENT = 16;
+const MAX_LINES = 5000;
+
+function isContainer(value: unknown): value is Record<string, unknown> | unknown[] {
+  return value !== null && typeof value === 'object';
+}
+
+function entriesOf(value: Record<string, unknown> | unknown[]): [string, unknown][] {
+  return Array.isArray(value)
+    ? value.map((item, index) => [String(index), item] as [string, unknown])
+    : Object.entries(value);
+}
+
+export function JsonTree({ data }: Props) {
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
+  const lines = useMemo(() => flatten(data, collapsed), [data, collapsed]);
+
+  const toggle = (path: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+
+  const shown = lines.length > MAX_LINES ? lines.slice(0, MAX_LINES) : lines;
   return (
     <div className="json">
-      <JsonNode value={data} depth={0} openDepth={openDepth} keyName={undefined} last />
+      {shown.map((line, index) => (
+        <JsonLine key={index} line={line} n={index + 1} onToggle={toggle} />
+      ))}
+      {lines.length > MAX_LINES && <HiddenLines count={lines.length - MAX_LINES} />}
     </div>
   );
 }
 
-interface NodeProps {
-  value: unknown;
-  depth: number;
-  openDepth: number;
-  keyName: string | undefined;
-  last: boolean;
+function HiddenLines({ count }: { count: number }) {
+  const { t } = useI18n();
+  return <div className="jv-hidden">{t('json.hidden', { count })}</div>;
 }
 
-function JsonNode({ value, depth, openDepth, keyName, last }: NodeProps) {
+function JsonLine({ line, n, onToggle }: { line: Line; n: number; onToggle: (path: string) => void }) {
   const { t } = useI18n();
-  const [open, setOpen] = useState(depth < openDepth);
-  const comma = last ? '' : ',';
-  const label = keyName !== undefined ? <span className="j-key">"{keyName}"</span> : null;
-
-  if (value === null) {
-    return (
-      <div className="j-row">
-        {label}
-        {label && <span className="j-colon">: </span>}
-        <span className="j-null">null</span>
-        {comma}
-      </div>
-    );
-  }
-  if (typeof value === 'string') {
-    return (
-      <div className="j-row">
-        {label}
-        {label && <span className="j-colon">: </span>}
-        <span className="j-str">"{value}"</span>
-        {comma}
-      </div>
-    );
-  }
-  if (typeof value === 'number') {
-    return (
-      <div className="j-row">
-        {label}
-        {label && <span className="j-colon">: </span>}
-        <span className="j-num">{String(value)}</span>
-        {comma}
-      </div>
-    );
-  }
-  if (typeof value === 'boolean') {
-    return (
-      <div className="j-row">
-        {label}
-        {label && <span className="j-colon">: </span>}
-        <span className="j-bool">{String(value)}</span>
-        {comma}
-      </div>
-    );
-  }
-
-  const isArray = Array.isArray(value);
-  const entries = isArray
-    ? (value as unknown[]).map((item, index) => [String(index), item] as const)
-    : Object.entries(value as Record<string, unknown>);
-  const brackets = isArray ? ['[', ']'] : ['{', '}'];
-
-  if (entries.length === 0) {
-    return (
-      <div className="j-row">
-        {label}
-        {label && <span className="j-colon">: </span>}
-        <span className="j-brace">{brackets[0]}</span>
-        <span className="j-brace">{brackets[1]}</span>
-        {comma}
-      </div>
-    );
-  }
+  const comma = line.last ? '' : ',';
+  const label = line.kind !== 'close' && line.key !== undefined && (
+    <>
+      <span className="jv-key">"{line.key}"</span>
+      <span className="jv-punct">: </span>
+    </>
+  );
 
   return (
-    <div className="j-node">
-      <div className="j-row">
-        <button type="button" className="j-toggle" onClick={() => setOpen((v) => !v)} aria-label={t('json.toggle')}>
-          {open ? <ChevronDown size={12} strokeWidth={2.4} /> : <ChevronRight size={12} strokeWidth={2.4} />}
-        </button>
-        {label}
-        {label && <span className="j-colon">: </span>}
-        <span className="j-brace">{brackets[0]}</span>
-        {!open && (
+    <div className="jv-line">
+      <span className="jv-ln">{n}</span>
+      <span className="jv-text" style={{ paddingLeft: 16 + line.depth * INDENT }}>
+        {line.kind === 'open' && (
+          <button
+            type="button"
+            className="jv-caret"
+            style={{ left: line.depth * INDENT }}
+            onClick={() => onToggle(line.path)}
+            aria-label={t('json.toggle')}
+            title={t('json.toggle')}
+          >
+            {line.open ? <ChevronDown size={11} strokeWidth={2.6} /> : <ChevronRight size={11} strokeWidth={2.6} />}
+          </button>
+        )}
+        {line.kind === 'leaf' ? (
           <>
-            <span className="j-summary">{t(isArray ? 'json.items' : 'json.keys', { count: entries.length })}</span>
-            <span className="j-brace">{brackets[1]}</span>
+            {label}
+            <Value value={line.value} />
             {comma}
           </>
-        )}
-        {open && <span className="j-brace">{brackets[1]}</span>}
-      </div>
-      {open && (
-        <div className="j-children">
-          {entries.map(([key, child], index) => (
-            <JsonNode
-              key={key}
-              value={child}
-              depth={depth + 1}
-              openDepth={openDepth}
-              keyName={isArray ? undefined : key}
-              last={index === entries.length - 1}
-            />
-          ))}
-          <div className="j-row">
-            <span className="j-brace">{brackets[1]}</span>
+        ) : line.kind === 'close' ? (
+          <span className="jv-punct">
+            {line.bracket}
             {comma}
-          </div>
-        </div>
-      )}
+          </span>
+        ) : (
+          <>
+            {label}
+            <span className="jv-punct">{line.bracket}</span>
+            {!line.open && (
+              <>
+                <span className="jv-summary">{t(line.bracket === '[' ? 'json.items' : 'json.keys', { count: line.count })}</span>
+                <span className="jv-punct">
+                  {line.bracket === '[' ? ']' : '}'}
+                  {comma}
+                </span>
+              </>
+            )}
+          </>
+        )}
+      </span>
     </div>
   );
+}
+
+function Value({ value }: { value: unknown }) {
+  if (value === null) return <span className="jv-null">null</span>;
+  if (typeof value === 'string') return <span className="jv-str">"{value}"</span>;
+  if (typeof value === 'number') return <span className="jv-num">{String(value)}</span>;
+  if (typeof value === 'boolean') return <span className="jv-bool">{String(value)}</span>;
+  if (Array.isArray(value)) return <span className="jv-punct">[]</span>;
+  if (typeof value === 'object') return <span className="jv-punct">{'{}'}</span>;
+  return <span className="jv-punct">{String(value)}</span>;
+}
+
+function flatten(data: unknown, collapsed: ReadonlySet<string>): Line[] {
+  const lines: Line[] = [];
+
+  const walk = (value: unknown, depth: number, path: string, key: string | undefined, last: boolean) => {
+    if (isContainer(value)) {
+      const entries = entriesOf(value);
+      if (entries.length === 0) {
+        lines.push({ kind: 'leaf', depth, key, value, last });
+        return;
+      }
+      const bracket = Array.isArray(value) ? '[' : '{';
+      const open = !collapsed.has(path);
+      lines.push({ kind: 'open', depth, path, key, bracket, count: entries.length, open, last });
+      if (open) {
+        entries.forEach(([childKey, child], index) =>
+          walk(child, depth + 1, `${path}.${childKey}`, Array.isArray(value) ? undefined : childKey, index === entries.length - 1),
+        );
+        lines.push({ kind: 'close', depth, bracket: bracket === '[' ? ']' : '}', last });
+      }
+      return;
+    }
+    lines.push({ kind: 'leaf', depth, key, value, last });
+  };
+
+  walk(data, 0, '$', undefined, true);
+  return lines;
 }
