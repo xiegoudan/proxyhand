@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, Download, FileJson, Terminal } from 'lucide-react';
+import { ArrowDown, ArrowUp, Copy, Download, FileJson, Terminal } from 'lucide-react';
 import type { BodyView, Flow, HeaderPair, SseFrame, WsFrame } from '../../../shared/protocol.ts';
 import { useI18n } from '../i18n.tsx';
 import {
@@ -229,8 +229,16 @@ function HeadersTable({ title, headers, tint }: { title: string; headers: Header
 function BodyBlock({ label, file, body }: { label: string; file: string; body: BodyView | undefined }) {
   const { t } = useI18n();
   const [mode, setMode] = useState<'pretty' | 'raw'>('pretty');
+  const [copied, setCopied] = useState(false);
   const text = body?.text ?? null;
   const json = useMemo(() => tryJson(text), [text]);
+  const copy = async () => {
+    if (!body) return;
+    // A binary body has no text to copy, so the base64 payload is what the clipboard gets.
+    const ok = await copyText(text ?? body.base64 ?? '');
+    setCopied(ok);
+    window.setTimeout(() => setCopied(false), 1400);
+  };
   const download = () => {
     if (!body) return;
     const blob = body.base64
@@ -263,6 +271,9 @@ function BodyBlock({ label, file, body }: { label: string; file: string; body: B
             </button>
           </div>
         )}
+        <button type="button" className="ghost small" onClick={copy}>
+          <Copy size={12} /> {copied ? t('detail.copied') : t('detail.copy')}
+        </button>
         <button type="button" className="ghost small" onClick={download}>
           <Download size={12} /> {t('detail.save')}
         </button>
@@ -333,7 +344,7 @@ function SseView({ flow, frames }: { flow: Flow; frames: SseFrame[] }) {
               {frame.comment && <div className="sse-comment">{frame.comment}</div>}
               {data !== undefined ? (
                 <div className="sse-data">
-                  <JsonTree data={data} openDepth={3} />
+                  <JsonTree data={data} />
                 </div>
               ) : (
                 <pre className="sse-data-text">{frame.data ?? ''}</pre>
@@ -401,7 +412,7 @@ function WsView({ frames }: { frames: WsFrame[] }) {
                   {frame.truncated && <span className="pill warn">{t('detail.truncatedPill')}</span>}
                 </div>
                 {json !== undefined ? (
-                  <JsonTree data={json} openDepth={2} />
+                  <JsonTree data={json} />
                 ) : (
                   <pre className="ws-text">{frame.text ?? t('detail.binaryFrame')}</pre>
                 )}

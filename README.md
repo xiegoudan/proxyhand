@@ -213,13 +213,14 @@ proxy:
 - **Chronological order by default** — new flows land at the bottom and the list follows them while you stay at the
   bottom. Click the **Time** column header (or press `o`) for newest-first; the choice is remembered.
 - **Overview**: timings (TTFB vs receive), byte counts, ALPN, proxy notes, both header tables.
-- **Request / Response**: headers with filter, bodies with a collapsible JSON tree (or raw), gzip/br/deflate decoded
-  on the fly, binary bodies downloadable, truncation flagged.
+- **Request / Response**: headers with filter, bodies as a JSON tree that starts fully expanded (or raw), one click
+  to copy the whole body, gzip/br/deflate decoded on the fly, binary bodies downloadable, truncation flagged.
 - **SSE**: every event individually — `event:`, `id:`, `retry:`, comments, byte size, arrival offset, JSON payload in
   a tree, follow-tail toggle, frame filter.
 - **WS**: both directions interleaved with `↑` / `↓`, opcode (text/binary/ping/pong/close), fragmentation and
   truncation flags, JSON payload tree.
-- **Copy cURL** for any flow, **HAR export** for one flow or everything, **pause / clear** capture.
+- **Copy cURL** for any flow, **HAR export** for one flow or everything, **pause / clear** capture — clearing
+  drops the finished flows and leaves the streams that are still open.
 - **English / 简体中文** switch in the header (`?lang=`), remembered in `localStorage`.
 
 ## How it works

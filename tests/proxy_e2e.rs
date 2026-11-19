@@ -500,3 +500,49 @@ async fn ui_answers_on_any_published_port() {
     // A browser hit is not a captured flow.
     assert_eq!(proxy.store.stats().total, 0);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn clearing_keeps_the_streams_that_are_still_open() {
+    let proxy = start_proxy(true, &[], true).await;
+    let upstream = start_http_upstream().await;
+    let authority = upstream.addr.to_string();
+
+    // One request that is over …
+    let done = proxy_get(proxy.addr, &format!("http://{authority}/hello")).await;
+    assert_eq!(done.status, 200, "body: {}", done.text());
+
+    // … and one stream that is still running.
+    let mut client = connect(proxy.addr).await;
+    let request_text =
+        format!("GET http://{authority}/idle-sse HTTP/1.1\r\nHost: {authority}\r\n\r\n");
+    client
+        .write_all(request_text.as_bytes())
+        .await
+        .expect("write idle SSE request");
+    let head = tokio::time::timeout(Duration::from_secs(3), read_response_head(&mut client))
+        .await
+        .expect("idle SSE headers timed out")
+        .expect("read idle SSE headers");
+    assert_eq!(head.status, 200);
+    wait_for_flow(proxy.addr, 2, |flow| {
+        flow["kind"] == "sse" && flow["open"] == true
+    })
+    .await;
+
+    let cleared = request(proxy.addr, "DELETE", "/api/flows", "127.0.0.1", &[], &[]).await;
+    assert_eq!(cleared.status, 200);
+
+    let (status, body) = api_get_json(proxy.addr, "/api/flows?limit=50").await;
+    assert_eq!(status, 200);
+    let flows = body["flows"].as_array().expect("flows");
+    assert_eq!(
+        flows.len(),
+        1,
+        "the finished flow is dropped and the open one stays: {body}"
+    );
+    assert_eq!(flows[0]["kind"], "sse");
+    assert_eq!(flows[0]["open"], true);
+    assert_eq!(body["total"], 1);
+
+    drop(client);
+}

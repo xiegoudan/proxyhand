@@ -4,11 +4,11 @@ import { useI18n } from '../i18n.tsx';
 
 interface Props {
   data: unknown;
-  /** depth to expand by default */
+  /** depth to expand by default; everything is open unless a caller asks otherwise */
   openDepth?: number;
 }
 
-export function JsonTree({ data, openDepth = 2 }: Props) {
+export function JsonTree({ data, openDepth = Number.POSITIVE_INFINITY }: Props) {
   return (
     <div className="json">
       <JsonNode value={data} depth={0} openDepth={openDepth} keyName={undefined} last />

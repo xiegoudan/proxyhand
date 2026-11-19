@@ -529,14 +529,28 @@ impl Store {
         true
     }
 
+    /// Drops the flows that already finished, but keeps the ones that are still open so a live
+    /// SSE or WebSocket stream the user is watching is never cut by pressing "clear".
     pub fn clear(&self) {
         {
             let mut inner = self.lock();
-            inner.flows.clear();
-            inner.order.clear();
-            inner.bytes_in = 0;
-            inner.bytes_out = 0;
-            inner.seq = 0;
+            let keep: Vec<u64> = inner
+                .order
+                .iter()
+                .copied()
+                .filter(|id| inner.flows.get(id).is_some_and(|flow| flow.summary.open))
+                .collect();
+            inner.flows.retain(|id, _| keep.contains(id));
+            inner.order = keep;
+            // Counters describe the flows that are still listed, not everything ever captured.
+            let mut bytes_in = 0u64;
+            let mut bytes_out = 0u64;
+            for flow in inner.flows.values() {
+                bytes_in += flow.summary.req_bytes.unwrap_or(0);
+                bytes_out += flow.summary.res_bytes.unwrap_or(0);
+            }
+            inner.bytes_in = bytes_in;
+            inner.bytes_out = bytes_out;
         }
         self.broadcast(ServerEvent::Cleared);
     }

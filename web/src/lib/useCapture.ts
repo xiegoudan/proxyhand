@@ -120,7 +120,7 @@ export function useCapture(): CaptureState {
 
   const listSeq = useRef(0);
 
-  const fetchList = useCallback(async (active: Filters) => {
+  const fetchList = useCallback(async (active: Filters, replace = false): Promise<FlowSummary[] | null> => {
     const seq = ++listSeq.current;
     const params = new URLSearchParams({ limit: String(MAX_ROWS) });
     if (active.q.trim()) params.set('q', active.q.trim());
@@ -129,26 +129,43 @@ export function useCapture(): CaptureState {
     if (active.status !== 'all') params.set('status', active.status);
     try {
       const res = await fetch(`/api/flows?${params.toString()}`);
-      if (!res.ok) return;
+      if (!res.ok) return null;
       const data = (await res.json()) as FlowListResponse;
       // A newer request (filter typed while this one was in flight) wins; drop the stale answer.
-      if (seq !== listSeq.current) return;
+      if (seq !== listSeq.current) return null;
       // Merge instead of replace: flows that arrived over the socket while the request was in
-      // flight are newer than the snapshot and must not be dropped.
+      // flight are newer than the snapshot and must not be dropped. After a clear the snapshot is
+      // the whole truth, so nothing from the old list may survive (open streams included).
       setRows((prev) => {
         const byId = new Map<number, FlowSummary>();
         for (const flow of data.flows) if (matches(flow, active)) byId.set(flow.id, flow);
-        for (const row of prev) {
-          if (!matches(row, active)) continue;
-          const old = byId.get(row.id);
-          if (!old || touched(row) >= touched(old)) byId.set(row.id, row);
+        if (!replace) {
+          for (const row of prev) {
+            if (!matches(row, active)) continue;
+            const old = byId.get(row.id);
+            if (!old || touched(row) >= touched(old)) byId.set(row.id, row);
+          }
         }
         return sortChronological([...byId.values()]);
       });
+      return data.flows;
     } catch {
       /* keep the previous list */
+      return null;
     }
   }, []);
+
+  // A clear removes the finished flows and keeps the ones still streaming, so the list is
+  // reloaded rather than blanked; the selection survives when its flow is still alive.
+  const afterClear = useCallback(async () => {
+    const keep = selectedRef.current;
+    const list = await fetchList(filtersRef.current, true);
+    if (keep === null || list === null) return;
+    if (list.some((flow) => flow.id === keep)) return;
+    setSelectedId(null);
+    setDetail(null);
+    setFrames({ id: 0, sse: [], ws: [] });
+  }, [fetchList]);
 
   const setOrder = useCallback((next: Order) => {
     setOrderState(next);
@@ -236,10 +253,7 @@ export function useCapture(): CaptureState {
             setDetail((prev) => (prev && prev.id === msg.id ? addWs(prev, msg.frame) : prev));
             break;
           case 'cleared':
-            setRows([]);
-            setDetail(null);
-            setSelectedId(null);
-            setFrames({ id: 0, sse: [], ws: [] });
+            void afterClear();
             break;
           case 'paused':
             setStats((prev) => (prev ? { ...prev, paused: msg.paused } : prev));
@@ -257,7 +271,7 @@ export function useCapture(): CaptureState {
       if (retry) window.clearTimeout(retry);
       socketRef.current?.close();
     };
-  }, [sendControl, lang]);
+  }, [sendControl, lang, afterClear]);
 
   // ---- load the selected flow's full record --------------------------------
   useEffect(() => {
@@ -294,11 +308,10 @@ export function useCapture(): CaptureState {
 
   const clear = useCallback(async () => {
     await fetch('/api/flows', { method: 'DELETE' });
-    setRows([]);
-    setDetail(null);
-    setSelectedId(null);
-    setFrames({ id: 0, sse: [], ws: [] });
-  }, []);
+    // The server broadcasts 'cleared' too; doing it here keeps the acting tab correct even
+    // when the websocket happens to be reconnecting.
+    await afterClear();
+  }, [afterClear]);
 
   const refresh = useCallback(() => void fetchList(filtersRef.current), [fetchList]);
 
