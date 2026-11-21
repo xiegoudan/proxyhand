@@ -8,9 +8,11 @@
 //! response head ◄── flow row + flow:update ◄── CaptureBody tee ◄── hyper client response
 //! ```
 
+use std::collections::HashMap;
 use std::io;
+use std::net::{IpAddr, SocketAddr};
 use std::pin::Pin;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
 use std::time::Duration;
 
@@ -48,6 +50,13 @@ const MAX_REQUEST_BODY: usize = 64 * 1024 * 1024;
 const HEADER_TIMEOUT: Duration = Duration::from_secs(30);
 /// How long a non-streaming response body may sit idle before the transfer is abandoned.
 const BODY_IDLE_TIMEOUT: Duration = Duration::from_secs(120);
+/// Name resolution results are reused this long: a browser opens many connections per page, and
+/// one getaddrinfo round trip per connection is the difference between instant and sluggish.
+const DNS_TTL: Duration = Duration::from_secs(60);
+/// A failed lookup is remembered briefly, so a broken name does not stall every retry.
+const DNS_FAILURE_TTL: Duration = Duration::from_secs(5);
+/// One address may take this long to accept a connection before the next one is tried.
+const ADDR_CONNECT_TIMEOUT: Duration = Duration::from_secs(3);
 
 /// A CONNECT tunnel handed to the tunnel worker. The hyper `Upgraded` future cannot be awaited
 /// inside the CONNECT service future itself: it would make `handle()`\x27s `Send` proof depend on
@@ -66,6 +75,8 @@ pub struct Proxy {
     pub lang: Lang,
     tunnels: mpsc::UnboundedSender<TunnelJob>,
     tunnel_rx: std::sync::Mutex<Option<mpsc::UnboundedReceiver<TunnelJob>>>,
+    /// host → addresses, with the moment they were resolved.
+    dns: Mutex<HashMap<String, (std::time::Instant, Vec<SocketAddr>)>>,
 }
 
 impl Proxy {
@@ -94,6 +105,7 @@ impl Proxy {
             lang,
             tunnels,
             tunnel_rx: std::sync::Mutex::new(Some(tunnel_rx)),
+            dns: Mutex::new(HashMap::new()),
         })
     }
 
@@ -280,18 +292,30 @@ impl Proxy {
             .store
             .create(tunnel_flow(&authority, &host, port, &client_ip))
             .map(|f| f.summary.id);
-        let mut upstream = match TcpStream::connect((host.as_str(), port)).await {
+        // Same resolver as the HTTP path: one lookup per tunnel would otherwise repeat the IPv6
+        // and EAI_AGAIN problems for every WebSocket-over-TLS client that opens a tunnel.
+        let addrs = match self.resolve(&host, port).await {
+            Ok(addrs) => addrs,
+            Err(e) => {
+                self.fail(
+                    flow_id,
+                    StatusCode::BAD_GATEWAY,
+                    i18n::upstream_error(self.lang, &e),
+                );
+                return;
+            }
+        };
+        let mut upstream = match connect_any(&addrs).await {
             Ok(stream) => stream,
             Err(e) => {
                 self.fail(
                     flow_id,
                     StatusCode::BAD_GATEWAY,
-                    i18n::upstream_error(self.lang, &e.to_string()),
+                    i18n::upstream_error(self.lang, &e),
                 );
                 return;
             }
         };
-        upstream.set_nodelay(true).ok();
         if upstream.write_all(&first).await.is_err() {
             return;
         }
@@ -769,10 +793,8 @@ impl Proxy {
     }
 
     async fn dial(&self, target: &Target) -> Result<Dialed, String> {
-        let tcp = TcpStream::connect(&target.connect)
-            .await
-            .map_err(|e| e.to_string())?;
-        tcp.set_nodelay(true).ok();
+        let addrs = self.resolve(&target.host, target.port).await?;
+        let tcp = connect_any(&addrs).await?;
         if target.scheme != "https" {
             return Ok(Dialed {
                 io: Box::new(tcp),
@@ -801,10 +823,7 @@ impl Proxy {
             Err(reason) => {
                 // Fail open: verification is attempted first, and a certificate error is
                 // answered by one retry without it, with the reason recorded on the flow.
-                let tcp = TcpStream::connect(&target.connect)
-                    .await
-                    .map_err(|e| e.to_string())?;
-                tcp.set_nodelay(true).ok();
+                let tcp = connect_any(&addrs).await?;
                 let tls = tls_connect(tcp, &target.host, &self.tls.insecure).await?;
                 let alpn = alpn_of(&tls);
                 Ok(Dialed {
@@ -815,6 +834,87 @@ impl Proxy {
             }
         }
     }
+
+    /// Resolves a host once and remembers the answer for a while.
+    ///
+    /// IPv4 addresses are returned first on purpose: a host with an AAAA record but no working
+    /// IPv6 route would otherwise burn a full connect timeout on every single request.
+    async fn resolve(&self, host: &str, port: u16) -> Result<Vec<SocketAddr>, String> {
+        if let Ok(ip) = host.parse::<IpAddr>() {
+            return Ok(vec![SocketAddr::new(ip, port)]);
+        }
+        if let Some(addrs) = self.cached_addrs(host) {
+            return if addrs.is_empty() {
+                Err(format!("cannot resolve {host} (temporary DNS failure)"))
+            } else {
+                Ok(addrs)
+            };
+        }
+
+        let mut last = String::from("no address returned");
+        // getaddrinfo reports EAI_AGAIN for transient resolver hiccups; one quick retry clears most.
+        for attempt in 0..2 {
+            match tokio::net::lookup_host((host, port)).await {
+                Ok(iter) => {
+                    let mut addrs: Vec<SocketAddr> = iter.collect();
+                    if addrs.is_empty() {
+                        break;
+                    }
+                    util::prefer_ipv4(&mut addrs);
+                    addrs.dedup();
+                    self.remember(host, &addrs, DNS_TTL);
+                    return Ok(addrs);
+                }
+                Err(e) => {
+                    last = e.to_string();
+                    if attempt == 0 {
+                        tokio::time::sleep(Duration::from_millis(80)).await;
+                    }
+                }
+            }
+        }
+        self.remember(host, &[], DNS_FAILURE_TTL);
+        Err(format!("cannot resolve {host}: {last}"))
+    }
+
+    fn cached_addrs(&self, host: &str) -> Option<Vec<SocketAddr>> {
+        let dns = self.dns.lock().unwrap_or_else(|e| e.into_inner());
+        let (at, addrs) = dns.get(host)?;
+        let ttl = if addrs.is_empty() {
+            DNS_FAILURE_TTL
+        } else {
+            DNS_TTL
+        };
+        (at.elapsed() < ttl).then(|| addrs.clone())
+    }
+
+    fn remember(&self, host: &str, addrs: &[SocketAddr], ttl: Duration) {
+        let mut dns = self.dns.lock().unwrap_or_else(|e| e.into_inner());
+        if dns.len() > 512 {
+            dns.retain(|_, (at, _)| at.elapsed() < ttl);
+        }
+        dns.insert(
+            host.to_string(),
+            (std::time::Instant::now(), addrs.to_vec()),
+        );
+    }
+}
+
+/// Connects to the first address that answers; each attempt is bounded so one black hole cannot
+/// eat the whole header timeout.
+async fn connect_any(addrs: &[SocketAddr]) -> Result<TcpStream, String> {
+    let mut last = String::from("no address to connect to");
+    for addr in addrs {
+        match timeout(ADDR_CONNECT_TIMEOUT, TcpStream::connect(addr)).await {
+            Ok(Ok(stream)) => {
+                stream.set_nodelay(true).ok();
+                return Ok(stream);
+            }
+            Ok(Err(e)) => last = format!("{addr}: {e}"),
+            Err(_) => last = format!("{addr}: connect timed out"),
+        }
+    }
+    Err(last)
 }
 
 trait Io: AsyncRead + AsyncWrite + Unpin + Send {}

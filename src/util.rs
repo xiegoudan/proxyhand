@@ -304,6 +304,14 @@ fn authority_for(host: &str, port: u16, scheme: &str) -> String {
     }
 }
 
+/// Sorts resolved addresses so IPv4 comes first.
+///
+/// A host that publishes an AAAA record but has no working IPv6 route would otherwise burn a
+/// connect timeout on every request before falling back to IPv4.
+pub fn prefer_ipv4(addrs: &mut [std::net::SocketAddr]) {
+    addrs.sort_by_key(|addr| addr.is_ipv6());
+}
+
 /// Splits `host:port`, `[::1]:443`, `[::1]`, `example.com` into host + port.
 pub fn split_host_port(value: &str, default_port: u16) -> (String, u16) {
     if let Some(rest) = value.strip_prefix('[') {

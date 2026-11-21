@@ -614,3 +614,26 @@ async fn replay_refuses_while_capture_is_paused() {
     .await;
     assert_eq!(status, 409, "body: {value}");
 }
+
+// A hostname target exercises name resolution, which lives next to the connect path: the proxy
+// resolves once, prefers IPv4 and reuses the answer for a while.
+#[tokio::test(flavor = "multi_thread")]
+async fn hostname_targets_are_resolved_and_reused() {
+    let proxy = start_proxy(true, &[], true).await;
+    let upstream = start_http_upstream().await;
+    let url = format!("http://localhost:{}/hello", upstream.addr.port());
+
+    for expected in 1..=3 {
+        let response = proxy_get(proxy.addr, &url).await;
+        assert_eq!(
+            response.status,
+            200,
+            "request {expected}: {}",
+            response.text()
+        );
+        assert_eq!(response.text(), "hello from upstream");
+        let detail = wait_for_flow(proxy.addr, expected, |flow| flow["open"] == false).await;
+        assert_eq!(detail["host"], "localhost");
+        assert_eq!(detail["port"], upstream.addr.port());
+    }
+}

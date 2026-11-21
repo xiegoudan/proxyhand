@@ -254,6 +254,9 @@ Design notes:
 - **No 20s body clock.** One socket timeout cannot serve both a JSON call and an SSE stream, so headers are bounded
   (30s: connect, handshake and response headers) separately from bodies. Streams are never reaped for being quiet;
   ordinary bodies are reclaimed after 120s of inactivity.
+- **Resolution cached, IPv4 first.** A browser opens dozens of connections per page, so a hostname is resolved once and
+  the answer reused for 60s; failed lookups are remembered for 5s instead of being retried in a storm. Addresses are
+  tried IPv4 first with a 3s bound each, so an unreachable AAAA record costs three seconds once, not thirty every time.
 - **No buffering.** SSE frame parsing happens on the same chunks that are forwarded, so long-lived streams appear
   incrementally and keep-alives stay intact. Response compression is decoded only for the recorded copy.
 - **Bounded memory.** Every capture is capped: `--max-body` per body (with truncation flagged and the dropped byte

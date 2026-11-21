@@ -409,3 +409,13 @@ fn multipart_form_bodies_stay_text_so_the_ui_can_split_fields() {
     );
     assert!(binary.base64.is_some());
 }
+
+#[test]
+fn ipv4_addresses_are_tried_before_ipv6() {
+    use std::net::SocketAddr;
+    let v6: SocketAddr = "[::1]:80".parse().unwrap();
+    let v4: SocketAddr = "127.0.0.1:80".parse().unwrap();
+    let mut addrs = vec![v6, v4];
+    proxyhand::util::prefer_ipv4(&mut addrs);
+    assert_eq!(addrs, vec![v4, v6]);
+}
