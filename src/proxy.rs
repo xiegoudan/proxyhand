@@ -793,8 +793,24 @@ impl Proxy {
     }
 
     async fn dial(&self, target: &Target) -> Result<Dialed, String> {
-        let addrs = self.resolve(&target.host, target.port).await?;
-        let tcp = connect_any(&addrs).await?;
+        let mut addrs = self.resolve(&target.host, target.port).await?;
+        let tcp = match connect_any(&addrs).await {
+            Ok(tcp) => tcp,
+            Err(first) => {
+                // A cached answer can go stale — fake-IP resolvers rotate their mappings, and a
+                // load-balanced pool drops addresses. Ask again once before giving up.
+                self.forget(&target.host);
+                match self.refresh(&target.host, target.port).await {
+                    Ok(fresh) => {
+                        addrs = fresh;
+                        connect_any(&addrs)
+                            .await
+                            .map_err(|second| format!("{first}; after a fresh lookup: {second}"))?
+                    }
+                    Err(e) => return Err(format!("{first}; {e}")),
+                }
+            }
+        };
         if target.scheme != "https" {
             return Ok(Dialed {
                 io: Box::new(tcp),
@@ -875,6 +891,19 @@ impl Proxy {
         }
         self.remember(host, &[], DNS_FAILURE_TTL);
         Err(format!("cannot resolve {host}: {last}"))
+    }
+
+    /// Resolves again, bypassing whatever the cache holds.
+    async fn refresh(&self, host: &str, port: u16) -> Result<Vec<SocketAddr>, String> {
+        self.forget(host);
+        self.resolve(host, port).await
+    }
+
+    fn forget(&self, host: &str) {
+        self.dns
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(host);
     }
 
     fn cached_addrs(&self, host: &str) -> Option<Vec<SocketAddr>> {
