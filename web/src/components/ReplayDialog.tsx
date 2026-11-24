@@ -1,9 +1,17 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Send, X } from 'lucide-react';
 import type { Flow } from '../../../shared/protocol.ts';
 import { useI18n } from '../i18n.tsx';
 import { tryJson } from '../lib/format.ts';
 import { parseForm, type FormField } from './FormView.tsx';
+import { JsonEditor } from './JsonEditor.tsx';
+import { Button } from './ui/button.tsx';
+import { Checkbox } from './ui/checkbox.tsx';
+import { Dialog, DialogContent, DialogTitle } from './ui/dialog.tsx';
+import { Input } from './ui/input.tsx';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select.tsx';
+import { Textarea } from './ui/textarea.tsx';
+import { cn } from '../lib/utils.ts';
 
 interface Props {
   flow: Flow;
@@ -14,6 +22,7 @@ interface Props {
 interface HeaderRow {
   name: string;
   value: string;
+  enabled: boolean;
 }
 
 const METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
@@ -30,7 +39,7 @@ const HIDDEN = new Set([
 
 function headerValue(headers: HeaderRow[], name: string): string | null {
   const hit = headers.find((row) => row.name.trim().toLowerCase() === name.toLowerCase());
-  return hit ? hit.value.trim() : null;
+  return hit && hit.enabled ? hit.value.trim() : null;
 }
 
 /** Encode the editable form rows back into an application/x-www-form-urlencoded body. */
@@ -53,28 +62,19 @@ export function ReplayDialog({ flow, onClose, onSent }: Props) {
   const [headers, setHeaders] = useState<HeaderRow[]>(() =>
     (flow.reqHeaders ?? [])
       .filter((pair) => !HIDDEN.has(pair.name.toLowerCase()))
-      .map((pair) => ({ name: pair.name, value: pair.value })),
+      .map((pair) => ({ name: pair.name, value: pair.value, enabled: true })),
   );
   const [body, setBody] = useState(initialBody);
   const [mode, setMode] = useState<'raw' | 'form'>('raw');
   const [formFields, setFormFields] = useState<FormField[]>([]);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const firstField = useRef<HTMLSelectElement>(null);
 
   const contentType = headerValue(headers, 'content-type');
   const form = useMemo(() => parseForm(contentType ?? undefined, body), [contentType, body]);
   const isUrlencoded = form?.kind === 'urlencoded';
   const json = useMemo(() => tryJson(body), [body]);
-
-  useEffect(() => {
-    firstField.current?.focus();
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [onClose]);
+  const jsonEditable = json !== undefined && json !== null;
 
   // Open the form editor for urlencoded payloads; everything else starts raw.
   useEffect(() => {
@@ -106,7 +106,7 @@ export function ReplayDialog({ flow, onClose, onSent }: Props) {
         method,
         url: url.trim(),
         headers: headers
-          .filter((row) => row.name.trim() !== '')
+          .filter((row) => row.enabled && row.name.trim() !== '')
           .map((row) => [row.name.trim(), row.value]),
       };
       const isBinary = Boolean(flow.reqBody?.base64);
@@ -143,101 +143,90 @@ export function ReplayDialog({ flow, onClose, onSent }: Props) {
   };
 
   return (
-    <div className="modal-backdrop" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="modal composer" role="dialog" aria-modal="true" aria-label={t('replay.title')}>
-        <header className="modal-head">
-          <h2>{t('replay.title')}</h2>
-          <button type="button" className="icon-btn" onClick={onClose} aria-label={t('detail.close')}>
-            <X size={15} />
-          </button>
-        </header>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="w-[min(960px,calc(100vw-40px))]">
+        <DialogTitle className="flex items-center gap-2 px-4 pb-3 pt-4">
+          {t('replay.title')}
+          <span className="rounded-md bg-secondary px-1.5 py-0.5 font-mono text-[11px] font-normal text-secondary-foreground">
+            {method} {flow.url}
+          </span>
+        </DialogTitle>
 
-        <div className="composer-main">
-          <div className="replay-row">
-            <select
-              ref={firstField}
-              className="replay-method"
-              value={method}
-              onChange={(event) => setMethod(event.target.value)}
-              aria-label={t('replay.method')}
-            >
-              {METHODS.map((candidate) => (
-                <option key={candidate} value={candidate}>
-                  {candidate}
-                </option>
-              ))}
-              {!METHODS.includes(method) && <option value={method}>{method}</option>}
-            </select>
-            <input
-              className="replay-url"
-              value={url}
-              onChange={(event) => setUrl(event.target.value)}
-              spellCheck={false}
-              aria-label={t('replay.url')}
-            />
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pb-2">
+          <div className="flex gap-2">
+            <Select value={method} onValueChange={setMethod}>
+              <SelectTrigger className="w-[118px] font-mono font-semibold uppercase" aria-label={t('replay.method')}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {METHODS.map((candidate) => (
+                  <SelectItem key={candidate} value={candidate}>
+                    {candidate}
+                  </SelectItem>
+                ))}
+                {!METHODS.includes(method) && <SelectItem value={method}>{method}</SelectItem>}
+              </SelectContent>
+            </Select>
+            <Input className="h-8 flex-1 font-mono text-[12.5px]" value={url} onChange={(e) => setUrl(e.target.value)} spellCheck={false} aria-label={t('replay.url')} />
           </div>
 
-          <div className="replay-section">
-            <div className="replay-label">
-              <span>{t('replay.headers')}</span>
-              <button
-                type="button"
-                className="ghost tiny"
-                onClick={() => setHeaders((prev) => [...prev, { name: '', value: '' }])}
-              >
+          <section className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('replay.headers')}</span>
+              <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => setHeaders((prev) => [...prev, { name: '', value: '', enabled: true }])}>
                 <Plus size={11} /> {t('replay.addHeader')}
-              </button>
+              </Button>
             </div>
-            <div className="replay-headers">
+            <div className="space-y-1">
               {headers.map((row, index) => (
-                <div className="replay-header-row" key={index}>
-                  <input
-                    className="replay-header-name"
+                <div className="flex items-center gap-1.5" key={index}>
+                  <Checkbox
+                    checked={row.enabled}
+                    onChange={(e) => setHeader(index, { enabled: e.target.checked })}
+                    aria-label={t('replay.headerEnabled')}
+                  />
+                  <Input
+                    className={cn('h-7 w-[34%] font-mono text-[12px]', !row.enabled && 'opacity-40')}
                     value={row.name}
-                    onChange={(event) => setHeader(index, { name: event.target.value })}
+                    onChange={(e) => setHeader(index, { name: e.target.value })}
                     placeholder="Header"
                     spellCheck={false}
                   />
-                  <input
-                    className="replay-header-value"
+                  <Input
+                    className={cn('h-7 flex-1 font-mono text-[12px]', !row.enabled && 'opacity-40')}
                     value={row.value}
-                    onChange={(event) => setHeader(index, { value: event.target.value })}
+                    onChange={(e) => setHeader(index, { value: e.target.value })}
                     placeholder="value"
                     spellCheck={false}
                   />
-                  <button
-                    type="button"
-                    className="icon-btn"
-                    onClick={() => setHeaders((prev) => prev.filter((_, i) => i !== index))}
-                    aria-label={t('replay.removeHeader')}
-                  >
+                  <Button size="iconSm" variant="ghost" onClick={() => setHeaders((prev) => prev.filter((_, i) => i !== index))} aria-label={t('replay.removeHeader')}>
                     <X size={12} />
-                  </button>
+                  </Button>
                 </div>
               ))}
             </div>
-          </div>
+          </section>
 
-          <div className="replay-section replay-body-section">
-            <div className="replay-label">
-              <span>{t('replay.body')}</span>
-              <span className="replay-toolbar">
-                {json !== undefined && json !== null && (
+          <section className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{t('replay.body')}</span>
+              <span className="flex items-center gap-1">
+                {jsonEditable && (
                   <>
-                    <button type="button" className="ghost tiny" onClick={() => setBody(JSON.stringify(json, null, 2))}>
+                    <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => setBody(JSON.stringify(json, null, 2))}>
                       {t('replay.pretty')}
-                    </button>
-                    <button type="button" className="ghost tiny" onClick={() => setBody(JSON.stringify(json))}>
+                    </Button>
+                    <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => setBody(JSON.stringify(json))}>
                       {t('replay.minify')}
-                    </button>
+                    </Button>
                   </>
                 )}
                 {isUrlencoded && (
-                  <span className="segmented">
-                    <button type="button" className={mode === 'form' ? 'is-active' : ''} onClick={() => switchMode('form')}>
+                  <span className="inline-flex items-center gap-0.5 rounded-md bg-secondary p-0.5">
+                    <button type="button" className={cn('seg-btn', mode === 'form' && 'is-active')} onClick={() => switchMode('form')}>
                       {t('replay.formMode')}
                     </button>
-                    <button type="button" className={mode === 'raw' ? 'is-active' : ''} onClick={() => switchMode('raw')}>
+                    <button type="button" className={cn('seg-btn', mode === 'raw' && 'is-active')} onClick={() => switchMode('raw')}>
                       {t('replay.rawMode')}
                     </button>
                   </span>
@@ -246,71 +235,56 @@ export function ReplayDialog({ flow, onClose, onSent }: Props) {
             </div>
 
             {flow.reqBody?.base64 ? (
-              <textarea className="replay-body" value={flow.reqBody.base64} readOnly rows={10} />
+              <Textarea value={flow.reqBody.base64} readOnly rows={10} className="font-mono text-[11.5px]" />
             ) : mode === 'form' ? (
-              <div className="replay-fields">
+              <div className="space-y-1">
                 {formFields.map((field, index) => (
-                  <div className="replay-field-row" key={index}>
-                    <input
-                      className="replay-header-name"
+                  <div className="flex items-center gap-1.5" key={index}>
+                    <Input
+                      className="h-7 w-[34%] font-mono text-[12px]"
                       value={field.name}
-                      onChange={(event) =>
-                        setFormFields((prev) => prev.map((row, i) => (i === index ? { ...row, name: event.target.value } : row)))
-                      }
+                      onChange={(e) => setFormFields((prev) => prev.map((row, i) => (i === index ? { ...row, name: e.target.value } : row)))}
                       placeholder={t('replay.fieldName')}
                       spellCheck={false}
                     />
-                    <input
-                      className="replay-header-value"
+                    <Input
+                      className="h-7 flex-1 font-mono text-[12px]"
                       value={field.value ?? ''}
-                      onChange={(event) =>
-                        setFormFields((prev) => prev.map((row, i) => (i === index ? { ...row, value: event.target.value } : row)))
-                      }
+                      onChange={(e) => setFormFields((prev) => prev.map((row, i) => (i === index ? { ...row, value: e.target.value } : row)))}
                       placeholder={t('replay.fieldValue')}
                       spellCheck={false}
                     />
-                    <button
-                      type="button"
-                      className="icon-btn"
-                      onClick={() => setFormFields((prev) => prev.filter((_, i) => i !== index))}
-                      aria-label={t('replay.removeHeader')}
-                    >
+                    <Button size="iconSm" variant="ghost" onClick={() => setFormFields((prev) => prev.filter((_, i) => i !== index))} aria-label={t('replay.removeHeader')}>
                       <X size={12} />
-                    </button>
+                    </Button>
                   </div>
                 ))}
-                <button
-                  type="button"
-                  className="ghost tiny form-add"
-                  onClick={() => setFormFields((prev) => [...prev, { name: '', value: '' }])}
-                >
+                <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => setFormFields((prev) => [...prev, { name: '', value: '' }])}>
                   <Plus size={11} /> {t('replay.addField')}
-                </button>
+                </Button>
               </div>
+            ) : jsonEditable ? (
+              <JsonEditor value={body} onChange={setBody} minHeight={200} maxHeight={360} />
             ) : (
-              <textarea
-                className="replay-body"
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
-                rows={12}
-                spellCheck={false}
-              />
+              <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={12} spellCheck={false} className="font-mono text-[12px] leading-relaxed" />
             )}
-            {flow.reqBody?.base64 && <div className="replay-hint">{t('replay.binaryBody')}</div>}
-          </div>
+            {flow.reqBody?.base64 && <div className="text-[11px] text-muted-foreground">{t('replay.binaryBody')}</div>}
+          </section>
 
-          {error && <div className="note warn replay-error">{error}</div>}
+          {error && (
+            <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-[12px] text-destructive">{error}</div>
+          )}
         </div>
 
-        <footer className="modal-actions replay-foot">
-          <button type="button" className="ghost" onClick={onClose}>
+        <footer className="flex items-center justify-end gap-2 border-t border-border px-4 py-3">
+          <Button variant="ghost" onClick={onClose}>
             {t('replay.cancel')}
-          </button>
-          <button type="button" className="primary" disabled={sending || url.trim() === ''} onClick={() => void send()}>
+          </Button>
+          <Button variant="default" disabled={sending || url.trim() === ''} onClick={() => void send()}>
             <Send size={13} /> {sending ? t('replay.sending') : t('replay.send')}
-          </button>
+          </Button>
         </footer>
-      </section>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

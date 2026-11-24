@@ -1,6 +1,7 @@
 import { Copy } from 'lucide-react';
 import { copyText } from '../lib/format.ts';
 import { useI18n } from '../i18n.tsx';
+import { Button } from './ui/button.tsx';
 
 export interface FormField {
   name: string;
@@ -45,10 +46,11 @@ function parseMultipart(text: string, boundary: string): FormField[] {
   const chunks = text.split(`--${boundary}`);
   for (const chunk of chunks) {
     if (!chunk.trim() || chunk.trim() === '--') continue;
-    const headerEnd = chunk.indexOf('\r\n\r\n') >= 0 ? chunk.indexOf('\r\n\r\n') : chunk.indexOf('\n\n');
+    const crlf = chunk.indexOf('\r\n\r\n') >= 0;
+    const headerEnd = crlf ? chunk.indexOf('\r\n\r\n') : chunk.indexOf('\n\n');
     if (headerEnd < 0) continue;
     const head = chunk.slice(0, headerEnd);
-    const body = chunk.slice(headerEnd + (chunk.indexOf('\r\n\r\n') >= 0 ? 4 : 2));
+    const body = chunk.slice(headerEnd + (crlf ? 4 : 2));
     const name = /name="([^"]*)"/i.exec(head)?.[1];
     if (name === undefined) continue;
     const filename = /filename="([^"]*)"/i.exec(head)?.[1];
@@ -106,14 +108,14 @@ export function FormTable({ fields }: { fields: FormField[] }) {
               (field.value ?? '')
             )}
           </span>
-          <button
-            type="button"
-            className="icon-btn form-copy"
+          <Button
+            size="iconSm"
+            variant="ghost"
             title={t('detail.copy')}
             onClick={() => void copyText(field.value ?? field.filename ?? '')}
           >
             <Copy size={12} />
-          </button>
+          </Button>
         </div>
       ))}
     </div>

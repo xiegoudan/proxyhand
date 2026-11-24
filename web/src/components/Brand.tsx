@@ -1,11 +1,25 @@
+import { cn } from '../lib/utils.ts';
+
 /**
- * The product mark: a teal tile with two arrows passing each other — traffic entering and
- * leaving through one point, which is all this tool does.
+ * The product mark: two arrows passing each other — traffic entering and
+ * leaving through one point. Rendered on a violet tile to match the accent.
  */
-export function BrandMark() {
+export function BrandMark({ size = 15, className }: { size?: number; className?: string }) {
   return (
-    <span className="brand-mark" aria-hidden="true">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+    <span
+      aria-hidden="true"
+      className={cn('inline-flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground shadow-sm', className)}
+    >
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M5 9h13" />
         <path d="M15 6l3 3-3 3" />
         <path d="M19 15H6" />

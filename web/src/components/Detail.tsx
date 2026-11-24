@@ -8,7 +8,6 @@ import {
   fmtDuration,
   fmtClock,
   fmtRelative,
-  headerValue,
   methodTone,
   statusTone,
   toCurl,
@@ -16,6 +15,11 @@ import {
 } from '../lib/format.ts';
 import { JsonTree } from './JsonTree.tsx';
 import { FormTable, parseForm } from './FormView.tsx';
+import { Badge } from './ui/badge.tsx';
+import { Button, buttonVariants } from './ui/button.tsx';
+import { Checkbox } from './ui/checkbox.tsx';
+import { Input } from './ui/input.tsx';
+import { cn } from '../lib/utils.ts';
 
 interface Props {
   flow: Flow;
@@ -52,86 +56,105 @@ export function Detail({ flow, sse, ws, onReplayed, onReplayFlow }: Props) {
   };
 
   return (
-    <section className="detail">
-      <header className="detail-head">
-        <div className="detail-title">
-          <span className={`method-badge method-${methodTone(flow.method)}`}>{flow.method}</span>
-          <span className={`status-badge status-${tone}`}>{flow.status ?? t('detail.pending')}</span>
-          <span className="detail-url" title={flow.url}>
+    <section className="flex min-h-0 flex-1 flex-col">
+      <header className="shrink-0 space-y-1.5 border-b border-border px-4 py-3">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={`font-mono text-[12px] font-bold uppercase method-${methodTone(flow.method)}`}>{flow.method}</span>
+          <span className={`status-${tone} font-mono text-[12px] font-semibold`}>{flow.status ?? t('detail.pending')}</span>
+          <span className="min-w-0 truncate font-mono text-[12.5px] text-foreground" title={flow.url}>
             {flow.url}
           </span>
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            <Button size="sm" variant="ghost" onClick={() => onReplayFlow(flow)}>
+              <Repeat size={13} /> {t('detail.replay')}
+            </Button>
+            <Button size="sm" variant="ghost" onClick={onCopyCurl}>
+              <Terminal size={13} /> {copied ? t('detail.copied') : t('detail.copyCurl')}
+            </Button>
+            <a className={buttonVariants({ size: 'sm', variant: 'ghost' })} href={`/api/export/har?ids=${flow.id}`} download>
+              <FileJson size={13} /> HAR
+            </a>
+          </div>
         </div>
-        <div className="detail-actions">
-          <button type="button" className="ghost" onClick={() => onReplayFlow(flow)}>
-            <Repeat size={13} /> {t('detail.replay')}
-          </button>
-          <button type="button" className="ghost" onClick={onCopyCurl}>
-            <Terminal size={13} /> {copied ? t('detail.copied') : t('detail.copyCurl')}
-          </button>
-          <a className="ghost" href={`/api/export/har?ids=${flow.id}`} download>
-            <FileJson size={13} /> HAR
-          </a>
-        </div>
-        <div className="detail-meta">
-          <span>{fmtDuration(flow.durationMs)}</span>
+        <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+          <span className="font-mono">{fmtDuration(flow.durationMs)}</span>
           <span>{fmtBytes(flow.resBytes ?? flow.size)}</span>
           {flow.clientIp && <span>{flow.clientIp}</span>}
           {flow.alpn && <span>ALPN {flow.alpn}</span>}
           {flow.kind !== 'http' && <span className={`kind-pill kind-${flow.kind}`}>{flow.kind}</span>}
-          {flow.open && <span className="live-dot">{t('detail.streaming')}</span>}
+          {flow.open && (
+            <span className="flex items-center gap-1.5">
+              <span className="pulse" /> {t('detail.streaming')}
+            </span>
+          )}
         </div>
       </header>
 
       {flow.notes?.length ? (
-        <div className="notes">
+        <div className="flex flex-wrap gap-1.5 border-b border-border px-4 py-2">
           {flow.notes.map((note) => (
-            <span key={note} className="note">
+            <Badge key={note} variant="redirect">
               {note}
-            </span>
+            </Badge>
           ))}
         </div>
       ) : null}
 
-      <nav className="tabs">
-        {TABS.filter((candidate) => candidate.id !== 'frames' || frameCount > 0 || flow.kind === 'sse' || flow.kind === 'ws').map((tabDef) => (
-          <button
-            type="button"
-            key={tabDef.id}
-            className={`tab${tab === tabDef.id ? ' is-active' : ''}`}
-            onClick={() => setTab(tabDef.id)}
-          >
-            {t(tabDef.key)}
-            {tabDef.id === 'frames' && frameCount > 0 && <span className="tab-count">{frameCount}</span>}
-            {tabDef.id === 'request' && flow.reqBody?.size ? (
-              <span className="tab-count">{fmtBytes(flow.reqBody.size)}</span>
-            ) : null}
-            {tabDef.id === 'response' && flow.resBody?.size ? (
-              <span className="tab-count">{fmtBytes(flow.resBody.size)}</span>
-            ) : null}
-          </button>
-        ))}
+      <nav className="shrink-0 px-4 pt-2">
+        <div className="inline-flex items-center gap-0.5 rounded-lg border border-border bg-card p-0.5">
+          {TABS.filter((candidate) => candidate.id !== 'frames' || frameCount > 0 || flow.kind === 'sse' || flow.kind === 'ws').map(
+            (tabDef) => (
+              <button
+                type="button"
+                key={tabDef.id}
+                className={cn(
+                  'inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-[12.5px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
+                  tab === tabDef.id ? 'bg-accent text-accent-foreground' : 'text-muted-foreground hover:text-foreground',
+                )}
+                onClick={() => setTab(tabDef.id)}
+              >
+                {t(tabDef.key)}
+                {tabDef.id === 'frames' && frameCount > 0 && (
+                  <Badge variant="secondary" className="px-1 py-px text-[10px]">
+                    {frameCount}
+                  </Badge>
+                )}
+                {tabDef.id === 'request' && flow.reqBody?.size ? (
+                  <Badge variant="secondary" className="px-1 py-px text-[10px]">
+                    {fmtBytes(flow.reqBody.size)}
+                  </Badge>
+                ) : null}
+                {tabDef.id === 'response' && flow.resBody?.size ? (
+                  <Badge variant="secondary" className="px-1 py-px text-[10px]">
+                    {fmtBytes(flow.resBody.size)}
+                  </Badge>
+                ) : null}
+              </button>
+            ),
+          )}
+        </div>
       </nav>
 
-      <div className="detail-body">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4">
         {tab === 'overview' && <Overview flow={flow} />}
         {tab === 'request' && (
-          <div className="pane">
+          <div className="space-y-4">
             <HeadersTable title={t('detail.requestHeaders')} headers={flow.reqHeaders} tint="req" />
             <BodyBlock label={t('detail.requestBody')} file="request-body" body={flow.reqBody} />
           </div>
         )}
         {tab === 'response' && (
-          <div className="pane">
+          <div className="space-y-4">
             <HeadersTable title={t('detail.responseHeaders')} headers={flow.resHeaders} tint="res" />
             <BodyBlock label={t('detail.responseBody')} file="response-body" body={flow.resBody} />
           </div>
         )}
         {tab === 'frames' && (
-          <div className="pane">
+          <div className="space-y-4">
             {sse.length > 0 && <SseView flow={flow} frames={sse} />}
             {ws.length > 0 && <WsView frames={ws} />}
             {sse.length === 0 && ws.length === 0 && (
-              <p className="hint">
+              <p className="text-xs text-muted-foreground">
                 {flow.kind === 'sse' || flow.kind === 'ws' ? t('detail.waitingFrames') : t('detail.noFrames')}
               </p>
             )}
@@ -147,7 +170,7 @@ function Overview({ flow }: { flow: Flow }) {
   const wait = flow.ttfbMs;
   const total = flow.durationMs ?? 0;
   const rows: { label: string; value: React.ReactNode }[] = [
-    { label: t('detail.overview.url'), value: <span className="mono wrap">{flow.url}</span> },
+    { label: t('detail.overview.url'), value: <span className="font-mono break-all">{flow.url}</span> },
     { label: t('detail.overview.started'), value: fmtClock(flow.startedAt) },
     { label: t('detail.overview.http'), value: `HTTP/${flow.httpVersion}` },
     { label: t('detail.overview.status'), value: `${flow.status ?? '—'} ${flow.statusText ?? ''}`.trim() },
@@ -161,9 +184,9 @@ function Overview({ flow }: { flow: Flow }) {
       value: flow.scheme === 'https' ? `ALPN ${flow.alpn ?? 'http/1.1'}` : t('detail.overview.plain'),
     },
   ];
-  if (flow.error) rows.push({ label: t('detail.overview.error'), value: <span className="danger">{flow.error}</span> });
+  if (flow.error) rows.push({ label: t('detail.overview.error'), value: <span className="text-destructive">{flow.error}</span> });
   return (
-    <div className="pane">
+    <div className="space-y-4">
       <div className="overview-grid">
         {rows.map((row) => (
           <div className="kv" key={row.label}>
@@ -173,22 +196,23 @@ function Overview({ flow }: { flow: Flow }) {
         ))}
       </div>
       {total > 0 && (
-        <div className="timing">
-          <div className="timing-label">{t('detail.timing')}</div>
+        <div className="space-y-1.5 rounded-lg border border-border bg-card p-3">
+          <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('detail.timing')}</div>
           <div className="timing-bar">
             <div
-              className="timing-seg timing-wait"
+              className="timing-wait h-full"
               style={{ width: `${Math.min(100, ((wait ?? total) / total) * 100)}%` }}
               title={t('detail.timingWait', { duration: fmtDuration(wait) })}
             />
-            <div
-              className="timing-seg timing-recv"
-              title={t('detail.timingReceive', { duration: fmtDuration(total - (wait ?? total)) })}
-            />
+            <div className="timing-recv h-full flex-1" title={t('detail.timingReceive', { duration: fmtDuration(total - (wait ?? total)) })} />
           </div>
-          <div className="timing-legend">
-            <span className="dot dot-wait" /> {t('detail.wait')} {fmtDuration(wait)}
-            <span className="dot dot-recv" /> {t('detail.receive')} {fmtDuration(Math.max(0, total - (wait ?? total)))}
+          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+            <span>
+              <span className="dot dot-wait" /> {t('detail.wait')} {fmtDuration(wait)}
+            </span>
+            <span>
+              <span className="dot dot-recv" /> {t('detail.receive')} {fmtDuration(Math.max(0, total - (wait ?? total)))}
+            </span>
           </div>
         </div>
       )}
@@ -207,24 +231,24 @@ function HeadersTable({ title, headers, tint }: { title: string; headers: Header
     return (headers ?? []).filter((h) => `${h.name}: ${h.value}`.toLowerCase().includes(q));
   }, [headers, filter]);
   return (
-    <div className="headers">
-      <div className="section-head">
-        <h3>{title}</h3>
-        <span className="section-count">{shown.length}</span>
-        <input
-          className="mini-input"
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <h3 className="text-[12px] font-semibold text-foreground">{title}</h3>
+        <Badge variant="secondary">{shown.length}</Badge>
+        <Input
+          className="ml-auto h-6 w-48 text-[11px]"
           placeholder={t('detail.headersFilter')}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
           spellCheck={false}
         />
       </div>
-      <div className={`header-table tint-${tint}`}>
-        {shown.length === 0 && <div className="hint">{t('detail.none')}</div>}
+      <div className="header-table">
+        {shown.length === 0 && <div className="px-3 py-4 text-center text-xs text-muted-foreground">{t('detail.none')}</div>}
         {shown.map((header, index) => (
           <div className="header-row" key={`${header.name}-${index}`}>
             <span className="header-name">{header.name}</span>
-            <span className="header-value mono">{header.value}</span>
+            <span className="header-value">{header.value}</span>
           </div>
         ))}
       </div>
@@ -325,47 +349,53 @@ function BodyBlock({ label, file, body }: { label: string; file: string; body: B
 
   if (!body) return null;
   return (
-    <div className="body-block">
-      <div className="section-head">
-        <h3>{label}</h3>
-        <span className="section-count">
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-center gap-2">
+        <h3 className="text-[12px] font-semibold">{label}</h3>
+        <span className="text-[11px] text-muted-foreground">
           {fmtBytes(body.size)}
           {body.decodedSize !== undefined && body.encoding ? ` · ${body.encoding} → ${fmtBytes(body.decodedSize)}` : ''}
         </span>
         {(json !== undefined || form !== undefined) && (
-          <div className="segmented">
+          <div className="inline-flex items-center gap-0.5 rounded-md bg-secondary p-0.5">
             {json !== undefined && (
-              <button type="button" className={mode === 'pretty' ? 'is-active' : ''} onClick={() => setMode('pretty')}>
+              <button
+                type="button"
+                className={cn('seg-btn', mode === 'pretty' && 'is-active')}
+                onClick={() => setMode('pretty')}
+              >
                 {t('detail.tree')}
               </button>
             )}
             {form !== undefined && (
-              <button type="button" className={mode === 'form' ? 'is-active' : ''} onClick={() => setMode('form')}>
+              <button type="button" className={cn('seg-btn', mode === 'form' && 'is-active')} onClick={() => setMode('form')}>
                 {t('detail.form')}
               </button>
             )}
-            <button type="button" className={mode === 'raw' ? 'is-active' : ''} onClick={() => setMode('raw')}>
+            <button type="button" className={cn('seg-btn', mode === 'raw' && 'is-active')} onClick={() => setMode('raw')}>
               {t('detail.raw')}
             </button>
           </div>
         )}
-        <button type="button" className="ghost small" onClick={copy}>
-          <Copy size={12} /> {copied ? t('detail.copied') : t('detail.copy')}
-        </button>
-        <button type="button" className="ghost small" onClick={download}>
-          <Download size={12} /> {t('detail.save')}
-        </button>
+        <div className="ml-auto flex items-center gap-1">
+          <Button size="sm" variant="ghost" onClick={copy}>
+            <Copy size={12} /> {copied ? t('detail.copied') : t('detail.copy')}
+          </Button>
+          <Button size="sm" variant="ghost" onClick={download}>
+            <Download size={12} /> {t('detail.save')}
+          </Button>
+        </div>
       </div>
       {body.truncated && (
-        <div className="note warn">
+        <Badge variant="redirect">
           {t('detail.truncated')}
           {body.dropped ? t('detail.truncatedDropped', { size: fmtBytes(body.dropped) }) : t('detail.truncatedEnd')}
-        </div>
+        </Badge>
       )}
       {imageSrc ? (
         <div className="image-preview">
           <img src={imageSrc} alt={label} />
-          <div className="image-caption">
+          <div className="mt-1 text-[11px] text-muted-foreground">
             {body.mime} · {fmtBytes(body.size)}
             {body.decodedSize !== undefined && body.encoding
               ? ` · ${body.encoding} → ${fmtBytes(body.decodedSize)}`
@@ -373,12 +403,12 @@ function BodyBlock({ label, file, body }: { label: string; file: string; body: B
           </div>
         </div>
       ) : body.base64 ? (
-        <div className="binary">
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-card px-3 py-4 text-[12px] text-muted-foreground">
           <span className="binary-icon">▩</span>
           {t('detail.binary')} · {fmtBytes(body.size)} {body.mime ? `· ${body.mime}` : ''}
         </div>
       ) : text === '' ? (
-        <div className="hint">{t('detail.emptyBody')}</div>
+        <div className="px-3 py-6 text-center text-xs text-muted-foreground">{t('detail.emptyBody')}</div>
       ) : form !== undefined && (mode === 'form' || (json === undefined && mode === 'pretty')) ? (
         <FormTable fields={form.fields} />
       ) : json !== undefined && mode === 'pretty' ? (
@@ -403,42 +433,36 @@ function SseView({ flow, frames }: { flow: Flow; frames: SseFrame[] }) {
   }, [frames.length, follow]);
 
   return (
-    <div className="frames">
-      <div className="section-head">
-        <h3>
-          {t('detail.sseTitle')} <span className="section-count">{frames.length}</span>
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <h3 className="text-[12px] font-semibold">
+          {t('detail.sseTitle')} <Badge variant="secondary">{frames.length}</Badge>
         </h3>
-        <input
-          className="mini-input"
+        <Input
+          className="ml-auto h-6 w-48 text-[11px]"
           placeholder={t('detail.filterFrames')}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-        <label className="check">
-          <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} /> {t('detail.follow')}
+        <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground">
+          <Checkbox checked={follow} onChange={(e) => setFollow(e.target.checked)} /> {t('detail.follow')}
         </label>
       </div>
-      <div className="sse-list">
+      <div className="max-h-[560px] space-y-2 overflow-y-auto pr-1">
         {shown.map((frame) => {
           const data = tryJson(frame.data);
           return (
             <div className="sse-frame" key={frame.i}>
-              <div className="sse-frame-head">
+              <div className="mb-1 flex items-center gap-2">
                 <span className="frame-index">#{frame.i}</span>
                 <span className="frame-time">{fmtRelative(flow.startedAt, frame.ts)}</span>
-                {frame.event && <span className="pill event">event: {frame.event}</span>}
-                {frame.id && <span className="pill id">id: {frame.id}</span>}
+                {frame.event && <span className="pill">event: {frame.event}</span>}
+                {frame.id && <span className="pill">id: {frame.id}</span>}
                 {frame.retry !== undefined && <span className="pill">retry: {frame.retry}</span>}
-                <span className="frame-bytes">{fmtBytes(frame.bytes)}</span>
+                <span className="frame-bytes ml-auto">{fmtBytes(frame.bytes)}</span>
               </div>
               {frame.comment && <div className="sse-comment">{frame.comment}</div>}
-              {data !== undefined ? (
-                <div className="sse-data">
-                  <JsonTree data={data} />
-                </div>
-              ) : (
-                <pre className="sse-data-text">{frame.data ?? ''}</pre>
-              )}
+              {data !== undefined ? <JsonTree data={data} /> : <pre className="code-block max-h-64">{frame.data ?? ''}</pre>}
             </div>
           );
         })}
@@ -465,47 +489,49 @@ function WsView({ frames }: { frames: WsFrame[] }) {
   }, [frames.length, follow]);
 
   return (
-    <div className="frames">
-      <div className="section-head">
-        <h3>
-          {t('detail.wsTitle')} <span className="section-count">{frames.length}</span>
+    <div className="space-y-1.5">
+      <div className="flex items-center gap-2">
+        <h3 className="text-[12px] font-semibold">
+          {t('detail.wsTitle')} <Badge variant="secondary">{frames.length}</Badge>
         </h3>
-        <span className="hint">
+        <span className="text-[11px] text-muted-foreground">
           {t('detail.wsSent', { count: c2s })} · {t('detail.wsReceived', { count: frames.length - c2s })}
         </span>
-        <input
-          className="mini-input"
+        <Input
+          className="ml-auto h-6 w-48 text-[11px]"
           placeholder={t('detail.filterFrames')}
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-        <label className="check">
-          <input type="checkbox" checked={follow} onChange={(e) => setFollow(e.target.checked)} /> {t('detail.follow')}
+        <label className="flex cursor-pointer items-center gap-1.5 text-[11px] text-muted-foreground">
+          <Checkbox checked={follow} onChange={(e) => setFollow(e.target.checked)} /> {t('detail.follow')}
         </label>
       </div>
-      <div className="ws-list">
+      <div className="max-h-[560px] space-y-2 overflow-y-auto pr-1">
         {shown.map(({ frame, seq }) => {
           const json = tryJson(frame.text);
           return (
             <div className={`ws-frame dir-${frame.dir}`} key={`${frame.dir}-${frame.i}`}>
-              <div className="ws-gutter">
-                <span className="ws-arrow">
-                  {frame.dir === 'c2s' ? <ArrowUp size={13} strokeWidth={2.6} /> : <ArrowDown size={13} strokeWidth={2.6} />}
-                </span>
-                <span className="frame-index">#{seq}</span>
-              </div>
-              <div className="ws-body">
-                <div className="ws-meta">
-                  <span className={`pill op-${frame.opcodeName}`}>{frame.opcodeName}</span>
-                  <span>{fmtBytes(frame.size)}</span>
-                  {!frame.fin && <span className="pill">{t('detail.fragment')}</span>}
-                  {frame.truncated && <span className="pill warn">{t('detail.truncatedPill')}</span>}
+              <div className="flex gap-3">
+                <div className="ws-gutter">
+                  <span className="ws-arrow">
+                    {frame.dir === 'c2s' ? <ArrowUp size={13} strokeWidth={2.6} /> : <ArrowDown size={13} strokeWidth={2.6} />}
+                  </span>
+                  <span className="frame-index">#{seq}</span>
                 </div>
-                {json !== undefined ? (
-                  <JsonTree data={json} />
-                ) : (
-                  <pre className="ws-text">{frame.text ?? t('detail.binaryFrame')}</pre>
-                )}
+                <div className="min-w-0 flex-1">
+                  <div className="mb-1 flex items-center gap-2">
+                    <span className={`pill op-${frame.opcodeName}`}>{frame.opcodeName}</span>
+                    <span className="text-[11px] text-muted-foreground">{fmtBytes(frame.size)}</span>
+                    {!frame.fin && <span className="pill">{t('detail.fragment')}</span>}
+                    {frame.truncated && <span className="pill warn">{t('detail.truncatedPill')}</span>}
+                  </div>
+                  {json !== undefined ? (
+                    <JsonTree data={json} />
+                  ) : (
+                    <pre className="code-block max-h-64">{frame.text ?? t('detail.binaryFrame')}</pre>
+                  )}
+                </div>
               </div>
             </div>
           );
