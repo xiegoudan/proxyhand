@@ -269,7 +269,7 @@ const zh: Dict = {
     listLabel: '已抓取的请求',
     emptyTitle: '暂无流量。',
     emptyHint: '将浏览器或应用的代理指向该端口，然后开始浏览。SSE 和 WebSocket 帧会实时显示在这里。',
-    events: '{count} 个事件',
+    events: '{count} 事件',
     frames: '{count} 帧',
   },
   detail: {
