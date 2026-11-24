@@ -30,6 +30,45 @@ export function App() {
   const [trust, setTrust] = useState<{ caPath: string; instructions: string[] } | null>(null);
   const [composerFlow, setComposerFlow] = useState<Flow | null>(null);
 
+  // Resizable split between the flow list and the detail pane. Persisted so the
+  // chosen width survives a reload; clamped so neither side disappears.
+  const SPLIT_KEY = 'proxyhand:listWidth';
+  const MIN_LIST = 320;
+  const MIN_DETAIL = 360;
+  const [listWidth, setListWidth] = useState<number>(() => {
+    const raw = Number(localStorage.getItem(SPLIT_KEY));
+    return Number.isFinite(raw) && raw >= MIN_LIST ? raw : 520;
+  });
+  const dragging = useRef(false);
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      const max = window.innerWidth - MIN_DETAIL;
+      const next = Math.max(MIN_LIST, Math.min(max, e.clientX));
+      setListWidth(next);
+    };
+    const onUp = () => {
+      if (!dragging.current) return;
+      dragging.current = false;
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+  }, []);
+  useEffect(() => {
+    localStorage.setItem(SPLIT_KEY, String(listWidth));
+  }, [listWidth]);
+  const startDrag = () => {
+    dragging.current = true;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  };
+
   const proxyLabel = useMemo(() => {
     const port = stats?.proxyPort ?? 7747;
     return `127.0.0.1:${port}`;
@@ -204,7 +243,7 @@ export function App() {
       </header>
 
       <main className="flex min-h-0 flex-1">
-        <div className="flex w-[430px] shrink-0 flex-col border-r border-border bg-card/40">
+        <div className="flex shrink-0 flex-col border-r border-border bg-card/40" style={{ width: listWidth }}>
           <FlowList
             flows={flows}
             selectedId={selectedId}
@@ -214,6 +253,14 @@ export function App() {
             onReplay={(id) => void openReplay(id)}
           />
         </div>
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          title={t('detail.resizeHint')}
+          className="splitter"
+          onMouseDown={startDrag}
+          onDoubleClick={() => setListWidth(520)}
+        />
         <div className="flex min-w-0 flex-1 flex-col">
           {detail ? (
             <Detail

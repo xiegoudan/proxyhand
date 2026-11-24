@@ -119,6 +119,29 @@
   gap: 8px;
   align-items: center;
 }
+/* Draggable divider between the list and the detail pane. */
+.splitter {
+  position: relative;
+  width: 5px;
+  flex: none;
+  cursor: col-resize;
+  background: transparent;
+  transition: background-color 120ms;
+}
+.splitter::after {
+  content: '';
+  position: absolute;
+  inset: 0 2px;
+  background: var(--color-border);
+}
+.splitter:hover,
+.splitter:active {
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+}
+.splitter:hover::after,
+.splitter:active::after {
+  background: var(--primary);
+}
 .col-kind {
   display: inline-flex;
   align-items: center;
