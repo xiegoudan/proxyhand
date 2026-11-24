@@ -225,6 +225,8 @@ proxy:
   truncation flags, JSON payload tree.
 - **Replay** any request: edit the method, URL, headers and body in a dialog and send it again through the proxy
   (same TLS path, same capture). The new flow appears in the list and is selected for you.
+- **Images shown inline**: an `image/*` response body renders as the picture itself (PNG/JPEG/WebP/GIF from the
+  captured bytes, SVG from its text), with the mime type and size as a caption — no base64 squinting.
 - **Copy cURL** for any flow, **HAR export** for one flow or everything, **pause / clear** capture — clearing
   drops the finished flows and leaves the streams that are still open.
 - **English / 简体中文** switch in the header (`?lang=`), remembered in `localStorage`.

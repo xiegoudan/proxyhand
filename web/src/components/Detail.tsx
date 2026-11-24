@@ -244,6 +244,15 @@ function BodyBlock({ label, file, body }: { label: string; file: string; body: B
   const text = body?.text ?? null;
   const json = useMemo(() => tryJson(text), [text]);
   const form = useMemo(() => parseForm(body?.mime, text), [body?.mime, text]);
+  // An image body is shown as the image itself, not as a pile of base64. SVG arrives
+  // as text (it is XML), everything else arrives as base64.
+  const imageSrc = useMemo(() => {
+    const mime = (body?.mime ?? '').toLowerCase();
+    if (!mime.startsWith('image/')) return null;
+    if (body?.base64) return 'data:' + mime + ';base64,' + body.base64;
+    if (body?.text) return 'data:' + mime + ';utf8,' + encodeURIComponent(body.text);
+    return null;
+  }, [body]);
   const copy = async () => {
     if (!body) return;
     // A binary body has no text to copy, so the base64 payload is what the clipboard gets.
@@ -303,7 +312,17 @@ function BodyBlock({ label, file, body }: { label: string; file: string; body: B
           {body.dropped ? t('detail.truncatedDropped', { size: fmtBytes(body.dropped) }) : t('detail.truncatedEnd')}
         </div>
       )}
-      {body.base64 ? (
+      {imageSrc ? (
+        <div className="image-preview">
+          <img src={imageSrc} alt={label} />
+          <div className="image-caption">
+            {body.mime} · {fmtBytes(body.size)}
+            {body.decodedSize !== undefined && body.encoding
+              ? ` · ${body.encoding} → ${fmtBytes(body.decodedSize)}`
+              : ''}
+          </div>
+        </div>
+      ) : body.base64 ? (
         <div className="binary">
           <span className="binary-icon">▩</span>
           {t('detail.binary')} · {fmtBytes(body.size)} {body.mime ? `· ${body.mime}` : ''}
