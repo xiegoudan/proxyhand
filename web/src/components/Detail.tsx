@@ -237,6 +237,42 @@ function HeadersTable({ title, headers, tint }: { title: string; headers: Header
   );
 }
 
+// Some APIs return the image as a text payload that is ALREADY a data URI
+// (e.g. captcha endpoints answering `data:image/jpg;base64,/9j/...` with a
+// misleading `Content-Type: image/jpeg`). Pull the first usable data:image URI
+// out of such a text, whether it is the whole body, a quoted string, or a value
+// nested inside a JSON object.
+function dataImageFrom(text: string | null): string | null {
+  if (!text) return null;
+  const normalize = (uri: string): string | null => {
+    const u = uri.trim().replace(/^['"]|['"]$/g, '');
+    if (!/^data:image\//i.test(u)) return null;
+    return u.replace(/^data:image\/jpe?g;/i, 'data:image/jpeg;').replace(/^data:image\/pjpeg;/i, 'data:image/jpeg;');
+  };
+  const straight = normalize(text);
+  if (straight) return straight;
+  const parsed = tryJson(text);
+  if (parsed && typeof parsed === 'object') {
+    const found: string[] = [];
+    const walk = (v: unknown): void => {
+      if (typeof v === 'string') found.push(v);
+      else if (Array.isArray(v)) v.forEach(walk);
+      else if (v && typeof v === 'object') Object.values(v as Record<string, unknown>).forEach(walk);
+    };
+    walk(parsed);
+    for (const candidate of found) {
+      const uri = normalize(candidate);
+      if (uri) return uri;
+    }
+  }
+  // Fallback: an image URI embedded in a longer plain-text payload.
+  const base64 = text.match(/data:image\/[a-z0-9.+-]+(?:;[a-z0-9.+-]+=[^;,"'\s]+)*;base64,[a-z0-9+/=]+/i);
+  if (base64) return normalize(base64[0]);
+  const svg = text.match(/data:image\/svg\+xml(?:;charset=utf-8)?,[^"'\s<]+/i);
+  if (svg) return normalize(svg[0]);
+  return null;
+}
+
 function BodyBlock({ label, file, body }: { label: string; file: string; body: BodyView | undefined }) {
   const { t } = useI18n();
   const [mode, setMode] = useState<'pretty' | 'form' | 'raw'>('pretty');
@@ -245,12 +281,31 @@ function BodyBlock({ label, file, body }: { label: string; file: string; body: B
   const json = useMemo(() => tryJson(text), [text]);
   const form = useMemo(() => parseForm(body?.mime, text), [body?.mime, text]);
   // An image body is shown as the image itself, not as a pile of base64. SVG arrives
-  // as text (it is XML), everything else arrives as base64.
+  // as text (it is XML), everything else arrives as base64. But a "binary" body whose
+  // bytes actually spell a `data:image/...` URI (and a text body that IS such a URI)
+  // is shown directly from that URI — the bytes are not the image yet.
   const imageSrc = useMemo(() => {
     const mime = (body?.mime ?? '').toLowerCase();
-    if (!mime.startsWith('image/')) return null;
-    if (body?.base64) return 'data:' + mime + ';base64,' + body.base64;
-    if (body?.text) return 'data:' + mime + ';utf8,' + encodeURIComponent(body.text);
+    if (body?.base64) {
+      let decodedText: string | null = null;
+      try {
+        const bin = atob(body.base64);
+        if (/^\s*data:/i.test(bin)) decodedText = bin;
+      } catch {
+        decodedText = null;
+      }
+      if (decodedText) {
+        const uri = dataImageFrom(decodedText);
+        if (uri) return uri;
+      }
+      if (mime.startsWith('image/')) return 'data:' + mime + ';base64,' + body.base64;
+      return null;
+    }
+    if (body?.text) {
+      const uri = dataImageFrom(body.text);
+      if (uri) return uri;
+      if (mime.startsWith('image/')) return 'data:' + mime + ';utf8,' + encodeURIComponent(body.text);
+    }
     return null;
   }, [body]);
   const copy = async () => {
