@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react';
-import { ArrowDown, ArrowUp } from 'lucide-react';
+import { ArrowDown, ArrowUp, Repeat } from 'lucide-react';
 import type { FlowSummary } from '../../../shared/protocol.ts';
 import { useI18n } from '../i18n.tsx';
 import type { Order } from '../lib/useCapture.ts';
@@ -11,9 +11,10 @@ interface Props {
   onSelect: (id: number) => void;
   order: Order;
   onToggleOrder: () => void;
+  onReplay?: (id: number) => void;
 }
 
-export function FlowList({ flows, selectedId, onSelect, order, onToggleOrder }: Props) {
+export function FlowList({ flows, selectedId, onSelect, order, onToggleOrder, onReplay }: Props) {
   const { t } = useI18n();
   const listRef = useRef<HTMLDivElement>(null);
   /** true while the user is parked at the bottom of a chronological list: keep following new flows */
@@ -49,6 +50,7 @@ export function FlowList({ flows, selectedId, onSelect, order, onToggleOrder }: 
         >
           {t('flowList.columns.time')} {order === 'asc' ? <ArrowUp size={10} /> : <ArrowDown size={10} />}
         </button>
+        <span className="col-actions" />
       </div>
       <div
         className="flow-list"
@@ -71,14 +73,20 @@ export function FlowList({ flows, selectedId, onSelect, order, onToggleOrder }: 
         {flows.map((flow) => {
           const tone = statusTone(flow.status, flow.error);
           return (
-            <button
-              type="button"
+            <div
               role="option"
               aria-selected={flow.id === selectedId}
               data-flow-id={flow.id}
               key={flow.id}
+              tabIndex={0}
               className={`flow-row${flow.id === selectedId ? ' is-selected' : ''}${flow.open ? ' is-open' : ''}`}
               onClick={() => onSelect(flow.id)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault();
+                  onSelect(flow.id);
+                }
+              }}
               title={`${flow.method} ${flow.url}`}
             >
               <span className={`col-status status-${tone}`} title={flow.error ?? flow.statusText}>
@@ -102,7 +110,23 @@ export function FlowList({ flows, selectedId, onSelect, order, onToggleOrder }: 
               <span className="col-time" title={fmtClock(flow.startedAt)}>
                 {flow.open ? <span className="pulse" /> : fmtDuration(flow.durationMs)}
               </span>
-            </button>
+              <span className="col-actions">
+                {onReplay && (
+                  <button
+                    type="button"
+                    className="icon-btn tiny row-replay"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onReplay(flow.id);
+                    }}
+                    title={t('detail.replay')}
+                    aria-label={t('detail.replay')}
+                  >
+                    <Repeat size={12} />
+                  </button>
+                )}
+              </span>
+            </div>
           );
         })}
       </div>

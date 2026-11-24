@@ -16,13 +16,13 @@ import {
 } from '../lib/format.ts';
 import { JsonTree } from './JsonTree.tsx';
 import { FormTable, parseForm } from './FormView.tsx';
-import { ReplayDialog } from './ReplayDialog.tsx';
 
 interface Props {
   flow: Flow;
   sse: SseFrame[];
   ws: WsFrame[];
   onReplayed: (id: number) => void;
+  onReplayFlow: (flow: Flow) => void;
 }
 
 type Tab = 'overview' | 'request' | 'response' | 'frames';
@@ -33,11 +33,10 @@ const TABS: { id: Tab; key: string }[] = [
   { id: 'frames', key: 'detail.tabs.frames' },
 ];
 
-export function Detail({ flow, sse, ws, onReplayed }: Props) {
+export function Detail({ flow, sse, ws, onReplayed, onReplayFlow }: Props) {
   const { t } = useI18n();
   const [tab, setTab] = useState<Tab>('overview');
   const [copied, setCopied] = useState(false);
-  const [replayOpen, setReplayOpen] = useState(false);
 
   useEffect(() => {
     setTab(flow.kind === 'sse' || flow.kind === 'ws' ? 'frames' : 'overview');
@@ -63,7 +62,7 @@ export function Detail({ flow, sse, ws, onReplayed }: Props) {
           </span>
         </div>
         <div className="detail-actions">
-          <button type="button" className="ghost" onClick={() => setReplayOpen(true)}>
+          <button type="button" className="ghost" onClick={() => onReplayFlow(flow)}>
             <Repeat size={13} /> {t('detail.replay')}
           </button>
           <button type="button" className="ghost" onClick={onCopyCurl}>
@@ -82,10 +81,6 @@ export function Detail({ flow, sse, ws, onReplayed }: Props) {
           {flow.open && <span className="live-dot">{t('detail.streaming')}</span>}
         </div>
       </header>
-
-      {replayOpen && (
-        <ReplayDialog flow={flow} onClose={() => setReplayOpen(false)} onSent={onReplayed} />
-      )}
 
       {flow.notes?.length ? (
         <div className="notes">

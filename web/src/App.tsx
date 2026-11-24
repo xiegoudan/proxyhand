@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeftRight, Check, Copy, Download, Pause, Play, ShieldCheck, Trash2, X } from 'lucide-react';
+import type { Flow } from '../../shared/protocol.ts';
 import { BrandMark } from './components/Brand.tsx';
 import { Detail } from './components/Detail.tsx';
 import { FlowList } from './components/FlowList.tsx';
+import { ReplayDialog } from './components/ReplayDialog.tsx';
 import { LANGS, useI18n } from './i18n.tsx';
 import { fmtBytes, copyText } from './lib/format.ts';
 import { useCapture, type Filters } from './lib/useCapture.ts';
@@ -22,6 +24,7 @@ export function App() {
   const [copied, setCopied] = useState<string | null>(null);
   const [trustOpen, setTrustOpen] = useState(false);
   const [trust, setTrust] = useState<{ caPath: string; instructions: string[] } | null>(null);
+  const [composerFlow, setComposerFlow] = useState<Flow | null>(null);
 
   const proxyLabel = useMemo(() => {
     const port = stats?.proxyPort ?? 7747;
@@ -81,6 +84,18 @@ export function App() {
   };
 
   const openTrust = () => setTrustOpen(true);
+
+  // The composer needs the full record (headers + body); a list click only has the summary.
+  const openReplay = async (id: number) => {
+    try {
+      const res = await fetch(`/api/flows/${id}?lang=${encodeURIComponent(lang)}`);
+      if (!res.ok) return;
+      const flow = (await res.json()) as Flow;
+      setComposerFlow(flow);
+    } catch {
+      /* keep the list as-is; the row click already selected the flow */
+    }
+  };
 
   return (
     <div className="app">
@@ -181,7 +196,14 @@ export function App() {
       </header>
 
       <main className="layout">
-        <FlowList flows={flows} selectedId={selectedId} onSelect={select} order={order} onToggleOrder={toggleOrder} />
+        <FlowList
+          flows={flows}
+          selectedId={selectedId}
+          onSelect={select}
+          order={order}
+          onToggleOrder={toggleOrder}
+          onReplay={(id) => void openReplay(id)}
+        />
         <div className="detail-slot">
           {detail ? (
             <Detail
@@ -192,6 +214,7 @@ export function App() {
                 capture.refresh();
                 capture.select(id);
               }}
+              onReplayFlow={setComposerFlow}
             />
           ) : (
             <div className="detail-placeholder">
@@ -230,6 +253,18 @@ export function App() {
           {t('statusbar.downloadCa')}
         </a>
       </footer>
+
+      {composerFlow && (
+        <ReplayDialog
+          flow={composerFlow}
+          onClose={() => setComposerFlow(null)}
+          onSent={(id) => {
+            setComposerFlow(null);
+            capture.refresh();
+            capture.select(id);
+          }}
+        />
+      )}
 
       {trustOpen && (
         <div className="modal-backdrop" onClick={() => setTrustOpen(false)}>
