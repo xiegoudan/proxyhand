@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Send, X } from 'lucide-react';
 import type { Flow } from '../../../shared/protocol.ts';
 import { useI18n } from '../i18n.tsx';
@@ -75,6 +75,13 @@ export function ReplayDialog({ flow, onClose, onSent }: Props) {
   const isUrlencoded = form?.kind === 'urlencoded';
   const json = useMemo(() => tryJson(body), [body]);
   const jsonEditable = json !== undefined && json !== null;
+  // Once the body is (or started as) JSON, keep the CodeMirror editor mounted for
+  // the rest of the dialog's life. Gating on the live parse result would unmount
+  // the editor (and drop the caret) the instant the user momentarily produces
+  // invalid JSON while typing — which is what the editor's lint gutter is for.
+  const jsonModeRef = useRef(jsonEditable);
+  if (jsonEditable) jsonModeRef.current = true;
+  const useJsonEditor = jsonModeRef.current && !isUrlencoded;
 
   // Open the form editor for urlencoded payloads; everything else starts raw.
   useEffect(() => {
@@ -213,10 +220,22 @@ export function ReplayDialog({ flow, onClose, onSent }: Props) {
               <span className="flex items-center gap-1">
                 {jsonEditable && (
                   <>
-                    <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => setBody(JSON.stringify(json, null, 2))}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-1.5 text-[11px]"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setBody(JSON.stringify(json, null, 2))}
+                    >
                       {t('replay.pretty')}
                     </Button>
-                    <Button size="sm" variant="ghost" className="h-6 px-1.5 text-[11px]" onClick={() => setBody(JSON.stringify(json))}>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-6 px-1.5 text-[11px]"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => setBody(JSON.stringify(json))}
+                    >
                       {t('replay.minify')}
                     </Button>
                   </>
@@ -263,7 +282,7 @@ export function ReplayDialog({ flow, onClose, onSent }: Props) {
                   <Plus size={11} /> {t('replay.addField')}
                 </Button>
               </div>
-            ) : jsonEditable ? (
+            ) : useJsonEditor ? (
               <JsonEditor value={body} onChange={setBody} minHeight={200} maxHeight={360} />
             ) : (
               <Textarea value={body} onChange={(e) => setBody(e.target.value)} rows={12} spellCheck={false} className="font-mono text-[12px] leading-relaxed" />

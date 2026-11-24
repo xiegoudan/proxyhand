@@ -105,13 +105,19 @@ export function JsonEditor({ value, onChange, readOnly = false, minHeight = 180,
   }, [])
 
   // Sync external value changes into the editor (pretty/minify buttons).
+  // The user has focus in here, so keep it and land the caret at the end
+  // instead of letting the editor lose focus / collapse to a vanished cursor.
   useEffect(() => {
     const view = viewRef.current
     if (!view) return
     const current = view.state.doc.toString()
-    if (value !== current) {
-      view.dispatch({ changes: { from: 0, to: current.length, insert: value } })
-    }
+    if (value === current) return
+    const hadFocus = view.hasFocus
+    view.dispatch({
+      changes: { from: 0, to: current.length, insert: value },
+      selection: { anchor: value.length },
+    })
+    if (hadFocus) view.focus()
   }, [value])
 
   return (
