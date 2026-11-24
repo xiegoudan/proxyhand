@@ -37,13 +37,19 @@ const TABS: { id: Tab; key: string }[] = [
   { id: 'frames', key: 'detail.tabs.frames' },
 ];
 
+/** Pick the most useful default tab for a flow: streams → frames, otherwise the response. */
+function defaultTab(flow: Flow): Tab {
+  if (flow.kind === 'sse' || flow.kind === 'ws') return 'frames';
+  return 'response';
+}
+
 export function Detail({ flow, sse, ws, onReplayed, onReplayFlow }: Props) {
   const { t } = useI18n();
-  const [tab, setTab] = useState<Tab>('overview');
+  const [tab, setTab] = useState<Tab>(() => defaultTab(flow));
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    setTab(flow.kind === 'sse' || flow.kind === 'ws' ? 'frames' : 'overview');
+    setTab(defaultTab(flow));
   }, [flow.id, flow.kind]);
 
   const frameCount = sse.length + ws.length;
@@ -169,55 +175,97 @@ function Overview({ flow }: { flow: Flow }) {
   const { t } = useI18n();
   const wait = flow.ttfbMs;
   const total = flow.durationMs ?? 0;
-  const rows: { label: string; value: React.ReactNode }[] = [
-    { label: t('detail.overview.url'), value: <span className="font-mono break-all">{flow.url}</span> },
-    { label: t('detail.overview.started'), value: fmtClock(flow.startedAt) },
-    { label: t('detail.overview.http'), value: `HTTP/${flow.httpVersion}` },
-    { label: t('detail.overview.status'), value: `${flow.status ?? '—'} ${flow.statusText ?? ''}`.trim() },
-    { label: t('detail.overview.ttfb'), value: fmtDuration(wait) },
-    { label: t('detail.overview.duration'), value: fmtDuration(flow.durationMs) },
-    { label: t('detail.overview.requestBody'), value: fmtBytes(flow.reqBytes) },
-    { label: t('detail.overview.responseBody'), value: fmtBytes(flow.resBytes ?? flow.size) },
-    { label: t('detail.overview.client'), value: flow.clientIp ?? '—' },
-    {
-      label: t('detail.overview.tls'),
-      value: flow.scheme === 'https' ? `ALPN ${flow.alpn ?? 'http/1.1'}` : t('detail.overview.plain'),
-    },
-  ];
-  if (flow.error) rows.push({ label: t('detail.overview.error'), value: <span className="text-destructive">{flow.error}</span> });
+  const recv = Math.max(0, total - (wait ?? total));
+
   return (
-    <div className="space-y-4">
-      <div className="overview-grid">
-        {rows.map((row) => (
-          <div className="kv" key={row.label}>
-            <span className="kv-label">{row.label}</span>
-            <span className="kv-value">{row.value}</span>
-          </div>
-        ))}
+    <div className="ov">
+      {/* One line that matters most: METHOD url + status + quick metrics. */}
+      <div className="ov-summary">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <span className={cn('font-mono text-[12px] font-bold uppercase', `method-${methodTone(flow.method)}`)}>
+            {flow.method}
+          </span>
+          <span className={cn('font-mono text-[12px] font-semibold', `status-${statusTone(flow.status, flow.error)}`)}>
+            {flow.status ?? t('detail.pending')}
+          </span>
+          {flow.statusText && <span className="text-[11px] text-muted-foreground">{flow.statusText}</span>}
+          <span className="min-w-0 truncate font-mono text-[12px] text-foreground" title={flow.url}>
+            {flow.url}
+          </span>
+        </div>
+        <div className="ov-metrics">
+          <span title={t('detail.overview.ttfb')}>
+            <span className="ov-metric-label">TTFB</span> {fmtDuration(wait)}
+          </span>
+          <span title={t('detail.overview.duration')}>
+            <span className="ov-metric-label">{t('detail.overview.duration')}</span> {fmtDuration(flow.durationMs)}
+          </span>
+          <span title={t('detail.overview.responseBody')}>
+            <span className="ov-metric-label">{t('detail.overview.responseBody')}</span> {fmtBytes(flow.resBytes ?? flow.size)}
+          </span>
+        </div>
       </div>
+
+      {flow.error && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 font-mono text-[11.5px] text-destructive">
+          {flow.error}
+        </div>
+      )}
+
+      {/* Timing bar — thin, with the split labelled inline. */}
       {total > 0 && (
-        <div className="space-y-1.5 rounded-lg border border-border bg-card p-3">
-          <div className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">{t('detail.timing')}</div>
+        <div className="ov-block">
+          <div className="ov-block-head">{t('detail.timing')}</div>
           <div className="timing-bar">
             <div
               className="timing-wait h-full"
               style={{ width: `${Math.min(100, ((wait ?? total) / total) * 100)}%` }}
               title={t('detail.timingWait', { duration: fmtDuration(wait) })}
             />
-            <div className="timing-recv h-full flex-1" title={t('detail.timingReceive', { duration: fmtDuration(total - (wait ?? total)) })} />
+            <div
+              className="timing-recv h-full flex-1"
+              title={t('detail.timingReceive', { duration: fmtDuration(recv) })}
+            />
           </div>
-          <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+          <div className="mt-1.5 flex items-center gap-4 text-[11px] text-muted-foreground">
             <span>
               <span className="dot dot-wait" /> {t('detail.wait')} {fmtDuration(wait)}
             </span>
             <span>
-              <span className="dot dot-recv" /> {t('detail.receive')} {fmtDuration(Math.max(0, total - (wait ?? total)))}
+              <span className="dot dot-recv" /> {t('detail.receive')} {fmtDuration(recv)}
             </span>
           </div>
         </div>
       )}
-      <HeadersTable title={t('detail.requestHeaders')} headers={flow.reqHeaders} tint="req" />
-      <HeadersTable title={t('detail.responseHeaders')} headers={flow.resHeaders} tint="res" />
+
+      {/* Compact stat grid — the facts that don't belong in the header. */}
+      <div className="stat-grid">
+        <StatTile label={t('detail.overview.started')} value={fmtClock(flow.startedAt)} mono />
+        <StatTile label={t('detail.overview.http')} value={`HTTP/${flow.httpVersion}`} mono />
+        <StatTile label={t('detail.overview.requestBody')} value={fmtBytes(flow.reqBytes)} mono />
+        <StatTile label={t('detail.overview.client')} value={flow.clientIp ?? '—'} mono />
+        <StatTile
+          label={t('detail.overview.tls')}
+          value={flow.scheme === 'https' ? `ALPN ${flow.alpn ?? 'http/1.1'}` : t('detail.overview.plain')}
+          mono
+        />
+        {flow.kind !== 'http' && <StatTile label={t('detail.overview.status')} value={flow.kind} mono />}
+      </div>
+
+      {/* Headers side by side, devtools' "Headers" panel energy but 2 columns. */}
+      <div className="ov-headers">
+        <HeadersTable title={t('detail.requestHeaders')} headers={flow.reqHeaders} tint="req" />
+        <HeadersTable title={t('detail.responseHeaders')} headers={flow.resHeaders} tint="res" />
+      </div>
+    </div>
+  );
+}
+
+function StatTile({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
+  return (
+    <div className="stat-tile">
+      <span className="stat-label">{label}</span>
+      <span className={cn('stat-value', mono && 'font-mono')}>{value}</span>
     </div>
   );
 }
