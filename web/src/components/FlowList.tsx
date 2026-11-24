@@ -18,6 +18,26 @@ interface Props {
 
 const COL = 'flow-grid';
 
+/**
+ * Like a browser devtools request line: the tail of the path matters far more
+ * than the head, so we keep the last segment visible and let overflow be clipped
+ * on the left instead of the right. `direction: rtl` + `unicode-bidi: plaintext`
+ * makes ellipsis land at the start while the text still reads left-to-right.
+ */
+function PathCell({ path }: { path: string }) {
+  const p = path || '/';
+  const cut = p.lastIndexOf('/');
+  const head = cut > 0 ? p.slice(0, cut + 1) : '';
+  const tail = cut > 0 ? p.slice(cut + 1) : p;
+  if (!head) return <span className="url-path min-w-0 truncate">{p}</span>;
+  return (
+    <span className="url-path min-w-0 truncate" title={p}>
+      <span className="path-head">{head}</span>
+      <span className="path-tail">{tail}</span>
+    </span>
+  );
+}
+
 export function FlowList({ flows, selectedId, onSelect, order, onToggleOrder, onReplay }: Props) {
   const { t } = useI18n();
   const listRef = useRef<HTMLDivElement>(null);
@@ -107,8 +127,8 @@ export function FlowList({ flows, selectedId, onSelect, order, onToggleOrder, on
               </span>
               <span className={`col-method method-${methodTone(flow.method)} font-mono font-semibold`}>{flow.method}</span>
               <span className="col-url flex min-w-0 items-baseline gap-1">
-                <span className="url-host truncate">{flow.host}</span>
-                <span className="url-path min-w-0 truncate">{flow.path || '/'}</span>
+                <span className="url-host truncate" title={flow.host}>{flow.host}</span>
+                <PathCell path={flow.path} />
               </span>
               <span className="col-kind flex min-w-0 items-center gap-1">
                 {flow.kind !== 'http' && <span className={`kind-pill kind-${flow.kind}`}>{flow.kind}</span>}

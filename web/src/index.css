@@ -140,9 +140,33 @@
 
 .url-host {
   color: var(--color-muted-foreground);
+  flex: none;
+  max-width: 45%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 .url-path {
   color: var(--color-foreground);
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  /* Clip from the left so the filename (tail) stays visible, devtools-style. */
+  direction: rtl;
+  text-align: left;
+}
+.url-path > * {
+  direction: ltr;
+  unicode-bidi: embed;
+}
+/* Trim a long path from the left (keep the filename), devtools-style. */
+.url-path .path-head {
+  color: var(--color-muted-foreground);
+}
+.url-path .path-tail {
+  white-space: nowrap;
 }
 
 .status-ok {
