@@ -419,3 +419,31 @@ fn ipv4_addresses_are_tried_before_ipv6() {
     proxyhand::util::prefer_ipv4(&mut addrs);
     assert_eq!(addrs, vec![v4, v6]);
 }
+
+/// The Windows trust instructions must steer people to the Local Machine store (system-wide),
+/// not Current User, and mention certutil — the two things that make an installed CA actually
+/// take effect. Regression guard for the "installed to root but still prompted" report.
+#[test]
+fn windows_trust_instructions_mention_local_machine_and_certutil() {
+    let lines = proxyhand::i18n::trust_instructions_for(
+        proxyhand::i18n::TrustOs::Windows,
+        proxyhand::i18n::Lang::En,
+        "C:\\ca.crt",
+    );
+    let joined = lines.join("\n");
+    assert!(
+        joined.contains("certutil"),
+        "should show the certutil command: {joined}"
+    );
+    assert!(
+        joined.contains("Local Machine"),
+        "should distinguish Local Machine from Current User: {joined}"
+    );
+    let zh = proxyhand::i18n::trust_instructions_for(
+        proxyhand::i18n::TrustOs::Windows,
+        proxyhand::i18n::Lang::Zh,
+        "C:\\ca.crt",
+    )
+    .join("\n");
+    assert!(zh.contains("本地计算机"), "zh should say 本地计算机: {zh}");
+}

@@ -100,7 +100,7 @@ sudo rpm -U proxyhand-0.1.0-amd64.rpm             # Fedora / RHEL / openSUSE
 
 | 平台 | 命令 |
 | --- | --- |
-| Windows（管理员） | `certutil -addstore -f "ROOT" ca.crt` |
+| Windows（管理员） | `certutil -addstore -f Root ca.crt` —— 装进**本地计算机**存储（全局生效）。务必选“本地计算机”而非“当前用户”，否则只有你这个登录账户信任它。 |
 | Debian/Ubuntu/WSL | `sudo cp ca.crt /usr/local/share/ca-certificates/proxyhand.crt && sudo update-ca-certificates` |
 | Fedora/Arch | `sudo cp ca.crt /etc/pki/trust/anchors/ && sudo update-ca-trust` |
 | macOS | `sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ca.crt` |
@@ -108,7 +108,7 @@ sudo rpm -U proxyhand-0.1.0-amd64.rpm             # Fedora / RHEL / openSUSE
 | Node.js | `NODE_EXTRA_CA_CERTS=~/.proxyhand/ca.crt`（undici/fetch 会忽略系统证书库） |
 | curl | `--cacert ~/.proxyhand/ca.crt` 或 `-k` |
 
-UI 工具栏里的盾牌按钮会显示同样的说明，外加一个下载链接（`/api/ca.crt`）：
+UI 工具栏里的盾牌按钮会显示同样的说明，外加一个下载链接（`/api/ca.crt`）。它还会显示该 CA 的 **SHA-256 指纹**——如果客户端仍然拒绝代理签发的证书，请核对已安装证书的指纹是否一致，因为旧版 proxyhand 或另一份证书可能在证书库里留下了残留：
 
 ![信任说明](docs/ui-trust.png)
 `proxyhand --help`、启动横幅以及 `/api/trust` 都会带上这些说明，英文或中文都有。
@@ -206,8 +206,9 @@ proxy:
 
 - **实时流列表**，含方法、状态、耗时、大小，以及 `SSE` / `WS` / `tunnel` 标记，外加过滤（文本、
   类型、状态）和键盘浏览（`↑` `↓` 上下走，`/` 搜索，`Esc` 取消选中）。
-- **默认按时间顺序** —— 新流落在底部，只要你停在底部，列表就跟着它们走。点 **Time** 列头（或按 `o`）
-  切换成最新优先；这个选择会被记住。
+- **默认最新优先**（类 devtools）—— 最新的流落在顶部并保持可见。点 **Time** 列头（或按 `o`）可切换成按时间顺序
+  （新流在底部、像日志一样跟随尾部）；这个选择会被记住。滚动区域做了 overscroll 隔离，触控板一甩不会触发浏览器的
+  返回/下拉刷新手势。
 - **概览**：耗时（TTFB 与接收分别计）、字节数、ALPN、代理备注、两边的头表。
 - **请求 / 响应**：头部可过滤，正文默认展开成带行号的 JSON 树（Yaak 风格：可折叠分支、语法着色、长值自动换行），
   也可切原始文本；一键复制整段正文，gzip/br/deflate 即时解压，二进制正文可下载，截断会被标注。
@@ -249,6 +250,8 @@ proxy:
   绝不会悄悄地对每个请求降级，什么都没验证的时候也不会留任何备注。
 - **没有 20 秒的正文计时器。** 一个 socket 超时没法同时照顾 JSON 调用和 SSE 流，所以头部单独设界
   （30 秒：连接、握手和响应头），正文另算。流不会因为安静就被回收；普通正文在闲置 120 秒后回收。
+- **实时 `/ws` 推送会自己保温。** 每 15 秒发一个 WebSocket Ping，这样空闲连接不会被某些 https 代理/网关的
+  ~20–60 秒静默超时掐断——流列表和选中流的帧会持续推送，而不是卡住等到下一次重连。
 - **域名解析有缓存，IPv4 优先。** 一个页面会开几十条连接，所以域名只解析一次、结果复用 60 秒；解析失败记 5 秒，
   不会每个请求都重来一遍。地址按 IPv4 优先、每个地址最多等 3 秒，所以一条不可达的 AAAA 记录只花一次几秒，
   而不是每次都卡满超时。

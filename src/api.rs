@@ -263,6 +263,11 @@ impl Ui {
     }
 
     async fn ws_loop(self: Arc<Self>, upgraded: Upgraded) {
+        // Keep-alive: send a WebSocket Ping frame periodically. Some https proxies/gateways drop a
+        // connection that has been silent for ~20–60s, which would surface as the live feed (and the
+        // frames for the selected flow) randomly stopping. A periodic Ping keeps the path warm and
+        // also lets us notice a client that has actually gone away.
+        const KEEPALIVE: Duration = Duration::from_secs(15);
         let mut ws =
             WebSocketStream::from_raw_socket(TokioIo::new(upgraded), Role::Server, None).await;
         let mut events = self.store.subscribe();
@@ -277,9 +282,13 @@ impl Ui {
 
         // Coalesce stats so a burst of captured flows does not flood the socket.
         let mut stats_due: Option<Instant> = None;
+        // Next moment to emit a keep-alive Ping. A busy feed never hits this branch's deadline
+        // because real traffic keeps resetting the select; only genuinely idle links need it.
+        let mut next_ping = Instant::now() + KEEPALIVE;
 
         loop {
             let wake = stats_due.unwrap_or_else(|| Instant::now() + Duration::from_secs(3600));
+            let wake = wake.min(next_ping);
             tokio::select! {
                 incoming = ws.next() => {
                     match incoming {
@@ -330,6 +339,14 @@ impl Ui {
                         stats_due = None;
                         let event = ServerEvent::Stats { stats: self.store.stats() };
                         if !push(&mut ws, &event).await { break; }
+                    }
+                    // The wake fired because the keep-alive is due: send a Ping. If the socket is
+                    // gone the send fails and we drop the loop, letting the client reconnect.
+                    if Instant::now() >= next_ping {
+                        if ws.send(Message::Ping(Vec::new().into())).await.is_err() {
+                            break;
+                        }
+                        next_ping = Instant::now() + KEEPALIVE;
                     }
                 }
             }

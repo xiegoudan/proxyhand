@@ -73,6 +73,9 @@ const en = {
     scopeEnd: '.',
     copyPath: 'copy path',
     downloadCert: 'download ca.crt',
+    fingerprint: 'SHA-256 fingerprint',
+    verifyHint:
+      'Installed cert not being honored? Make sure it lands in the "Trusted Root Certification Authorities" store, and that its fingerprint matches the value below — an old proxyhand, or a different copy, can leave a stale certificate behind.',
   },
   flowList: {
     columns: {
@@ -253,6 +256,9 @@ const zh: Dict = {
     scopeEnd: '。',
     copyPath: '复制路径',
     downloadCert: '下载 ca.crt',
+    fingerprint: 'SHA-256 指纹',
+    verifyHint:
+      '装了证书还是不生效？确认它导入到了「受信任的根证书颁发机构」存储，并核对下方指纹——旧版本 proxyhand 或另一份证书可能残留，导致装错。',
   },
   flowList: {
     columns: {

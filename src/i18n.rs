@@ -196,17 +196,41 @@ pub fn shutting_down(lang: Lang) -> &'static str {
     }
 }
 
+/// Which OS the trust hint is written for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TrustOs {
+    Windows,
+    MacOs,
+    Unix,
+}
+
+/// The OS this build runs on, for trust instructions.
+pub fn current_trust_os() -> TrustOs {
+    if cfg!(windows) {
+        TrustOs::Windows
+    } else if cfg!(target_os = "macos") {
+        TrustOs::MacOs
+    } else {
+        TrustOs::Unix
+    }
+}
+
 /// Platform-specific hint for making the system trust the generated CA.
 pub fn trust_instructions(lang: Lang, ca_path: &str) -> Vec<String> {
-    let win = cfg!(windows);
-    let mac = cfg!(target_os = "macos");
+    trust_instructions_for(current_trust_os(), lang, ca_path)
+}
+
+/// Same as [`trust_instructions`] but with the OS chosen explicitly (testable off-platform).
+pub fn trust_instructions_for(os: TrustOs, lang: Lang, ca_path: &str) -> Vec<String> {
+    let win = os == TrustOs::Windows;
+    let mac = os == TrustOs::MacOs;
     match lang {
         Lang::En => {
             if win {
                 vec![
-                    format!("Windows: certutil -addstore -f \"ROOT\" \"{ca_path}\""),
-                    "or double-click the file and import it into \"Trusted Root Certification Authorities\"."
-                        .to_string(),
+                    format!("Windows (admin PowerShell/CMD): certutil -addstore -f Root \"{ca_path}\""),
+                    "GUI: double-click the .crt → Install Certificate → choose \"Local Machine\" → \"Place all certificates in the following store\" → Browse → \"Trusted Root Certification Authorities\".".to_string(),
+                    "Still prompted? Put it in \"Local Machine\", not \"Current User\" — only Local Machine is trusted system-wide by every process, not just your login.".to_string(),
                     format!("Node/undici clients ignore the OS store: set NODE_EXTRA_CA_CERTS={ca_path}"),
                 ]
             } else if mac {
@@ -233,8 +257,9 @@ pub fn trust_instructions(lang: Lang, ca_path: &str) -> Vec<String> {
         Lang::Zh => {
             if win {
                 vec![
-                    format!("Windows: certutil -addstore -f \"ROOT\" \"{ca_path}\""),
-                    "或双击该文件，导入到「受信任的根证书颁发机构」。".to_string(),
+                    format!("Windows（管理员 PowerShell/CMD）：certutil -addstore -f Root \"{ca_path}\""),
+                    "图形界面：双击 .crt → 安装证书 → 选择「本地计算机」→「将所有的证书都放入下列存储」→ 浏览 →「受信任的根证书颁发机构」。".to_string(),
+                    "仍被提示？请装到「本地计算机」而不是「当前用户」——只有「本地计算机」对所有进程全局生效，当前用户仅对你这个登录账户有效。".to_string(),
                     format!("Node/undici 客户端不读系统证书库：设置 NODE_EXTRA_CA_CERTS={ca_path}"),
                 ]
             } else if mac {

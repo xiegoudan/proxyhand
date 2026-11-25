@@ -102,7 +102,7 @@ SNI hostname on demand. Install the CA wherever your client keeps trust:
 
 | platform | command |
 | --- | --- |
-| Windows (admin) | `certutil -addstore -f "ROOT" ca.crt` |
+| Windows (admin) | `certutil -addstore -f Root ca.crt` — installs to **Local Machine** (system-wide). Use "Local Machine", not "Current User", or only your login account trusts it. |
 | Debian/Ubuntu/WSL | `sudo cp ca.crt /usr/local/share/ca-certificates/proxyhand.crt && sudo update-ca-certificates` |
 | Fedora/Arch | `sudo cp ca.crt /etc/pki/trust/anchors/ && sudo update-ca-trust` |
 | macOS | `sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ca.crt` |
@@ -110,7 +110,9 @@ SNI hostname on demand. Install the CA wherever your client keeps trust:
 | Node.js | `NODE_EXTRA_CA_CERTS=~/.proxyhand/ca.crt` (undici/fetch ignore the OS store) |
 | curl | `--cacert ~/.proxyhand/ca.crt` or `-k` |
 
-The shield button in the UI toolbar shows the same instructions and a download link (`/api/ca.crt`):
+The shield button in the UI toolbar shows the same instructions and a download link (`/api/ca.crt`). It also shows the
+CA's **SHA-256 fingerprint** — if a client still rejects the proxy's certificates, check that the installed cert's
+fingerprint matches, since a stale proxyhand (or a different copy) can leave a leftover certificate in the store:
 
 ![trust instructions](docs/ui-trust.png)
 `proxyhand --help`, the startup banner and `/api/trust` all carry these instructions, in English or Chinese.
@@ -213,8 +215,10 @@ proxy:
 
 - **Live flow list** with method, status, duration, size, and `SSE` / `WS` / `tunnel` badges, plus filters (text,
   kind, status) and keyboard walk-through (`↑` `↓`, `/` to search, `Esc` to deselect).
-- **Chronological order by default** — new flows land at the bottom and the list follows them while you stay at the
-  bottom. Click the **Time** column header (or press `o`) for newest-first; the choice is remembered.
+- **Newest-first by default** (devtools-style) — the latest flow lands on top and stays in view. Click the **Time**
+  column header (or press `o`) to switch to chronological (newest at the bottom, following the tail like a log); the
+  choice is remembered. Scroll regions are overscroll-contained so a trackpad fling never triggers the browser's
+  swipe-back / pull-to-refresh gesture.
 - **Overview**: timings (TTFB vs receive), byte counts, ALPN, proxy notes, both header tables.
 - **Request / Response**: headers with filter, bodies as a line-numbered JSON tree (Yaak-style: collapsed branches,
   syntax colours, wrapped long values) that starts fully expanded (or raw), one click to copy the whole body,
@@ -258,6 +262,9 @@ Design notes:
 - **No 20s body clock.** One socket timeout cannot serve both a JSON call and an SSE stream, so headers are bounded
   (30s: connect, handshake and response headers) separately from bodies. Streams are never reaped for being quiet;
   ordinary bodies are reclaimed after 120s of inactivity.
+- **The live `/ws` feed keeps itself warm.** It sends a WebSocket Ping every 15s, so an idle connection is never dropped
+  by a ~20–60s silent-connection timeout in some https proxy or gateway — the flow list and selected-flow frames keep
+  streaming instead of stalling until the next reconnect.
 - **Resolution cached, IPv4 first.** A browser opens dozens of connections per page, so a hostname is resolved once and
   the answer reused for 60s; failed lookups are remembered for 5s instead of being retried in a storm. Addresses are
   tried IPv4 first with a 3s bound each, so an unreachable AAAA record costs three seconds once, not thirty every time.

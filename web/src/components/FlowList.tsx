@@ -50,11 +50,17 @@ export function FlowList({ flows, selectedId, onSelect, order, onToggleOrder, on
     el?.scrollIntoView({ block: 'nearest' });
   }, [selectedId]);
 
-  // Chronological order puts new flows below the fold, so follow them unless the user scrolled up.
+  // Chronological ('asc') puts new flows below the fold, so follow them unless the user scrolled
+  // up. Newest-on-top ('desc', the default) already shows new flows at the top; if the user has
+  // scrolled down into history, keep their position instead of yanking them to the top.
   useLayoutEffect(() => {
     const el = listRef.current;
-    if (!el || order !== 'asc' || !stickRef.current) return;
-    el.scrollTop = el.scrollHeight;
+    if (!el) return;
+    if (order === 'asc') {
+      if (stickRef.current) el.scrollTop = el.scrollHeight;
+    } else if (stickRef.current) {
+      el.scrollTop = 0;
+    }
   }, [flows, order]);
 
   return (

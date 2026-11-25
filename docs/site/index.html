@@ -52,7 +52,7 @@
         "description": "A single-binary HTTP/HTTPS/SSE/WebSocket interception proxy with a built-in web UI, written in Rust.",
         "url": "https://xiegoudan.github.io/proxyhand/",
         "downloadUrl": "https://github.com/xiegoudan/proxyhand/releases/latest",
-        "softwareVersion": "0.1.14",
+        "softwareVersion": "0.1.15",
         "license": "https://github.com/xiegoudan/proxyhand/blob/main/LICENSE",
         "programmingLanguage": "Rust",
         "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
@@ -75,7 +75,7 @@
           </svg>
         </span>
         <span class="brand-name">proxyhand</span>
-        <span class="brand-ver">0.1.14</span>
+        <span class="brand-ver">0.1.15</span>
       </a>
       <nav class="topnav">
         <a href="#features" data-en="Features" data-zh="功能">Features</a>
@@ -155,10 +155,10 @@
           <article class="feat">
             <span class="feat-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h4l2-7 4 14 2-7h4"/></svg></span>
             <h3 data-en="Live SSE &amp; WebSocket" data-zh="实时 SSE 与 WebSocket">Live SSE &amp; WebSocket</h3>
-            <p data-en="Events and frames stream in the instant they arrive — event names, retry, comments, opcodes, both directions interleaved. Not one buffered blob."
-              data-zh="事件与帧一到即显示 —— 事件名、retry、注释、opcode、双向交织。不是等缓冲好再一股脑丢给你。">
+            <p data-en="Events and frames stream in the instant they arrive — event names, retry, comments, opcodes, both directions interleaved. Not one buffered blob, and the live feed pings itself so it never drifts off."
+              data-zh="事件与帧一到即显示 —— 事件名、retry、注释、opcode、双向交织。不是等缓冲好再一股脑丢给你；实时推送会自己保活，不会悄悄掉线。">
               Events and frames stream in the instant they arrive — event names, retry, comments, opcodes, both
-              directions interleaved. Not one buffered blob.
+              directions interleaved. Not one buffered blob, and the live feed pings itself so it never drifts off.
             </p>
           </article>
 
@@ -175,10 +175,10 @@
           <article class="feat">
             <span class="feat-ic" aria-hidden="true"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 5 6v6c0 4 3 7 7 9 4-2 7-5 7-9V6l-7-3Z"/><path d="m9 12 2 2 4-4"/></svg></span>
             <h3 data-en="Certificates on the fly" data-zh="证书即时签发">Certificates on the fly</h3>
-            <p data-en="An ECDSA root CA and per-SNI leaf certs minted on demand, plus a shield button that tells you exactly how to trust it, per platform."
-              data-zh="ECDSA 根 CA、按 SNI 即时签发的叶子证书，还有一个盾牌按钮，逐平台告诉你怎么信任它。">
-              An ECDSA root CA and per-SNI leaf certs minted on demand, plus a shield button that tells you exactly how
-              to trust it, per platform.
+            <p data-en="An ECDSA root CA and per-SNI leaf certs minted on demand. The shield button shows per-platform trust steps and the CA's SHA-256 fingerprint, so you can spot a stale or wrong copy."
+              data-zh="ECDSA 根 CA、按 SNI 即时签发的叶子证书。盾牌按钮给出各平台的信任步骤和 CA 的 SHA-256 指纹，一眼看出是不是装错了或装了旧的。">
+              An ECDSA root CA and per-SNI leaf certs minted on demand. The shield button shows per-platform trust
+              steps and the CA's SHA-256 fingerprint, so you can spot a stale or wrong copy.
             </p>
           </article>
 

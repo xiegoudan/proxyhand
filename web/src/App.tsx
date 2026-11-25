@@ -27,7 +27,7 @@ export function App() {
   const searchRef = useRef<HTMLInputElement>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [trustOpen, setTrustOpen] = useState(false);
-  const [trust, setTrust] = useState<{ caPath: string; instructions: string[] } | null>(null);
+  const [trust, setTrust] = useState<{ caPath: string; fingerprint?: string; instructions: string[] } | null>(null);
   const [composerFlow, setComposerFlow] = useState<Flow | null>(null);
 
   // Resizable split between the flow list and the detail pane. Persisted so the
@@ -109,7 +109,7 @@ export function App() {
     if (!trustOpen) return;
     let cancelled = false;
     fetch(`/api/trust?lang=${encodeURIComponent(lang)}`)
-      .then((res) => (res.ok ? (res.json() as Promise<{ caPath: string; instructions: string[] }>) : null))
+      .then((res) => (res.ok ? (res.json() as Promise<{ caPath: string; fingerprint?: string; instructions: string[] }>) : null))
       .then((data) => {
         if (!cancelled && data) setTrust(data);
       })
@@ -362,6 +362,15 @@ export function App() {
               </li>
             ))}
           </ol>
+          {trust?.fingerprint ? (
+            <div className="mt-3 rounded-md border border-border px-3 py-2">
+              <div className="text-[10.5px] font-medium uppercase tracking-wide text-muted-foreground">
+                {t('trust.fingerprint')}
+              </div>
+              <div className="mt-0.5 break-all font-mono text-[11px] text-foreground">{trust.fingerprint}</div>
+              <p className="mt-1.5 text-[11.5px] leading-relaxed text-muted-foreground">{t('trust.verifyHint')}</p>
+            </div>
+          ) : null}
           <footer className="mt-4 flex justify-end gap-2 border-t border-border pt-3">
             <Button variant="ghost" onClick={() => void markCopied('ca', trust?.caPath ?? '')}>
               <Copy size={13} /> {t('trust.copyPath')}

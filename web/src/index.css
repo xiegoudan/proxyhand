@@ -693,3 +693,17 @@
   color: var(--color-foreground);
   box-shadow: 0 0 0 1px var(--color-border);
 }
+
+/*
+ * Contain wheel/trackpad overscroll inside scroll regions. Without this, flinging past the top or
+ * bottom of the flow list, a frame list, or a JSON pane triggers the browser's swipe "back"/"pull
+ * to refresh" gesture, which looks like the app randomly reloading or bouncing. `contain` keeps the
+ * scroll-local rubber-band but never chains up to history navigation.
+ */
+.flow-list,
+.ov,
+.replay-scroll,
+.cm-host .cm-scroller,
+[class*="overflow-y-auto"] {
+  overscroll-behavior: contain;
+}

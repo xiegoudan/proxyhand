@@ -23,8 +23,9 @@ type StatusFilter = 'all' | 'ok' | 'error' | 'pending';
 export const emptyFilters: Filters = { q: '', kind: 'all', method: 'ALL', status: 'all' };
 
 /**
- * Row order of the flow list. 'asc' = chronological, newest at the bottom, the way a terminal log
- * reads; 'desc' = devtools-style, newest on top. Remembered across reloads.
+ * Row order of the flow list. 'desc' = devtools-style, newest on top (the default, and what people
+ * expect when watching a request stream); 'asc' = chronological, newest at the bottom, like a
+ * terminal log. Remembered across reloads.
  */
 export type Order = 'asc' | 'desc';
 
@@ -32,9 +33,10 @@ const ORDER_KEY = 'proxyhand:order';
 
 function readOrder(): Order {
   try {
-    return localStorage.getItem(ORDER_KEY) === 'desc' ? 'desc' : 'asc';
+    // Newest-on-top unless the user explicitly flipped to chronological.
+    return localStorage.getItem(ORDER_KEY) === 'asc' ? 'asc' : 'desc';
   } catch {
-    return 'asc';
+    return 'desc';
   }
 }
 
@@ -73,7 +75,7 @@ export interface CaptureState {
   total: number;
   filters: Filters;
   setFilters: (next: Partial<Filters>) => void;
-  /** row order of `flows`; 'asc' keeps the newest flow at the bottom */
+  /** row order of `flows`; 'desc' (default) keeps the newest flow on top */
   order: Order;
   setOrder: (next: Order) => void;
   toggleOrder: () => void;
