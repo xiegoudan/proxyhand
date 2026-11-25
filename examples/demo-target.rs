@@ -152,8 +152,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok()
         .and_then(|p| p.parse().ok())
         .unwrap_or(9911);
-    let listener = TcpListener::bind(SocketAddr::from(([127, 0, 0, 1], port))).await?;
-    println!("demo target on http://127.0.0.1:{port}  (/api/orders /sse /gzip /echo /slow /ws)");
+    let listener = TcpListener::bind(SocketAddr::from(([0, 0, 0, 0], port))).await?;
+    println!("demo target on http://0.0.0.0:{port}  (/api/orders /sse /gzip /echo /slow /ws)");
     loop {
         let (stream, _) = listener.accept().await?;
         tokio::spawn(async move {
