@@ -10,6 +10,8 @@ Written in Rust, so it ships as one static binary — nothing to install alongsi
 [![docker](https://img.shields.io/docker/v/xiegoudan/proxyhand?label=docker%20hub)](https://hub.docker.com/r/xiegoudan/proxyhand)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
+**[Website →](https://xiegoudan.github.io/proxyhand/)** · the landing page with screenshots and downloads.
+
 ```
 ┌───────────────┐   HTTP/HTTPS/WS   ┌────────────────────┐    ┌──────────────┐
 │ browser / app │ ────────────────► │     proxyhand      │ ─► │   upstream   │

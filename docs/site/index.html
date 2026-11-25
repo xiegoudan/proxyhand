@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en" class="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>proxyhand — HTTP/HTTPS/SSE/WebSocket interception proxy</title>
+    <meta
+      name="description"
+      content="A single-binary HTTP/HTTPS/SSE/WebSocket interception proxy with a built-in web UI. Written in Rust. Live SSE events and WebSocket frames, replay, HAR export."
+    />
+    <meta property="og:title" content="proxyhand" />
+    <meta
+      property="og:description"
+      content="One binary, one port for http:// and https://, certificates on the fly, and a live inspector for SSE and WebSocket."
+    />
+    <meta property="og:type" content="website" />
+    <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- ───────────────────────── header ───────────────────────── -->
+    <header class="topbar">
+      <a class="brand" href="#top">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 9h13l-3-3" />
+            <path d="M20 15H7l3 3" />
+          </svg>
+        </span>
+        <span class="brand-name">proxyhand</span>
+      </a>
+      <nav class="topnav">
+        <a href="#features" data-en="Features" data-zh="功能">Features</a>
+        <a href="#install" data-en="Install" data-zh="安装">Install</a>
+        <a href="#screens" data-en="Screenshots" data-zh="截图">Screenshots</a>
+        <a href="https://github.com/xiegoudan/proxyhand" target="_blank" rel="noopener">GitHub ↗</a>
+      </nav>
+      <button id="langBtn" class="lang" type="button" aria-label="Toggle language">中文</button>
+    </header>
+
+    <!-- ───────────────────────── hero ───────────────────────── -->
+    <main id="top">
+      <section class="hero">
+        <div class="hero-bg" aria-hidden="true"></div>
+        <div class="hero-inner">
+          <div class="pill">
+            <span class="dot"></span>
+            <span data-en="Single binary · Rust · Apache-2.0" data-zh="单文件 · Rust · Apache-2.0">Single binary · Rust · Apache-2.0</span>
+          </div>
+          <h1>
+            <span data-en="The interception proxy that" data-zh="看得见真实流的">The interception proxy that</span>
+            <span class="grad" data-en="streams" data-zh="拦截代理">streams</span>
+            <span data-en="what actually happened." data-zh="把握每一刻。">what actually happened.</span>
+          </h1>
+          <p class="lede" data-en="HTTP, HTTPS, SSE and WebSocket — on one port, in one static binary. Certificates are minted on the fly, and events and frames appear the moment they arrive instead of after a buffered blob."
+            data-zh="HTTP、HTTPS、SSE 与 WebSocket —— 一个端口、一个静态二进制搞定。证书按需即时签发，事件与帧一到就显示，而不是等一坨缓冲一起吐出来。">
+            HTTP, HTTPS, SSE and WebSocket — on one port, in one static binary. Certificates are minted on the fly, and
+            events and frames appear the moment they arrive instead of after a buffered blob.
+          </p>
+          <div class="cta">
+            <a class="btn primary" href="https://github.com/xiegoudan/proxyhand/releases/latest">
+              <span data-en="Download" data-zh="下载">Download</span> ↓
+            </a>
+            <a class="btn ghost" href="https://github.com/xiegoudan/proxyhand" target="_blank" rel="noopener">
+              <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+              <span data-en="Source" data-zh="源码">Source</span>
+            </a>
+            <a class="btn ghost" href="https://hub.docker.com/r/xiegoudan/proxyhand">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M4 11h3v3H4zM8 11h3v3H8zM12 11h3v3h-3zM8 7h3v3H8zM12 7h3v3h-3z"/><path d="M22 12.6c-.5-.35-1.6-.5-2.4-.3-.1-.9-.6-1.7-1.5-2.4l-.5-.35-.35.5c-.45.65-.6 1.7-.15 2.45-.35.2-1 .45-1.85.4H2.1l-.05.35c-.15 1 .05 2.3.75 3.2 1 1.3 2.55 1.95 4.6 1.95 4.35 0 7.6-2 9.1-5.6.6.05 1.9.05 2.55-1.25.05-.1.15-.35.15-.35l-.3-.2Z"/></svg>
+              <span>Docker</span>
+            </a>
+          </div>
+          <div class="term" aria-hidden="true">
+            <div class="term-bar"><i></i><i></i><i></i></div>
+            <pre><span class="c-dim">$</span> cargo install --git https://github.com/xiegoudan/proxyhand
+<span class="c-dim">$</span> proxyhand
+<span class="c-ok">proxyhand v0.1.14</span>  <span class="c-dim">·</span>  proxy + UI on <span class="c-key">http://127.0.0.1:7747</span>
+<span class="c-dim">CA cert ~/.proxyhand/ca.crt · http + https + ws share one port</span></pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ───────────────────────── features ───────────────────────── -->
+      <section id="features" class="section">
+        <h2 class="section-title">
+          <span data-en="Everything a debugging proxy needs" data-zh="调试代理该有的一切">Everything a debugging proxy needs</span>
+        </h2>
+        <p class="section-sub" data-en="No accounts, no cloud, no plugins to install. Runs on your machine and shows you the traffic." data-zh="无需账号、不连云、不装插件。跑在你本机，直接看清流量。">
+          No accounts, no cloud, no plugins to install. Runs on your machine and shows you the traffic.
+        </p>
+        <div class="grid">
+          <article class="card">
+            <div class="ic">⇅</div>
+            <h3 data-en="One port for everything" data-zh="一个端口包办">One port for everything</h3>
+            <p data-en="Plain HTTP, HTTPS via CONNECT + MITM, and the web UI all share one port. Open the UI on the very port you proxy on." data-zh="明文 HTTP、经 CONNECT + MITM 的 HTTPS、以及 Web UI 共用一个端口。在你代理的那个端口上直接打开 UI。">
+              Plain HTTP, HTTPS via CONNECT + MITM, and the web UI all share one port. Open the UI on the very port
+              you proxy on.
+            </p>
+          </article>
+          <article class="card">
+            <div class="ic">⚡</div>
+            <h3 data-en="Live SSE &amp; WebSocket" data-zh="实时 SSE 与 WebSocket">Live SSE &amp; WebSocket</h3>
+            <p data-en="Events and frames stream in the instant they arrive — event names, retry, comments, opcodes, both directions interleaved. No buffered blob." data-zh="事件与帧一到即显示 —— 事件名、retry、注释、opcode、双向交织。不是等缓冲好再一股脑丢给你。">
+              Events and frames stream in the instant they arrive — event names, retry, comments, opcodes, both
+              directions interleaved. No buffered blob.
+            </p>
+          </article>
+          <article class="card">
+            <div class="ic">🔒</div>
+            <h3 data-en="Certificates on the fly" data-zh="证书即时签发">Certificates on the fly</h3>
+            <p data-en="An ECDSA root CA, per-SNI leaf certs minted on demand, and a shield button that tells you exactly how to trust it per platform." data-zh="ECDSA 根 CA、按 SNI 即时签发的叶子证书，还有一个盾牌按钮，逐平台告诉你怎么信任它。">
+              An ECDSA root CA, per-SNI leaf certs minted on demand, and a shield button that tells you exactly how to
+              trust it per platform.
+            </p>
+          </article>
+          <article class="card">
+            <div class="ic">↻</div>
+            <h3 data-en="Replay any request" data-zh="重放任意请求">Replay any request</h3>
+            <p data-en="One click from the list. Edit method, URL, headers and body in a Postman-style composer — JSON formatted, forms as a field table — and send it back through the same TLS path." data-zh="列表里一键重放。在 Postman 风格的编辑器里改方法、URL、头与载荷 —— JSON 自动格式化、表单变字段表 —— 再经同样的 TLS 路径发回去。">
+              One click from the list. Edit method, URL, headers and body in a Postman-style composer — JSON
+              formatted, forms as a field table — and send it back through the same TLS path.
+            </p>
+          </article>
+          <article class="card">
+            <div class="ic">{ }</div>
+            <h3 data-en="Bodies you can read" data-zh="看得懂的载荷">Bodies you can read</h3>
+            <p data-en="Line-numbered JSON tree, form field tables, inline image previews, gzip/br/deflate decoded on the fly, binary downloadable, truncation flagged." data-zh="带行号的 JSON 树、表单字段表、图片内联预览、gzip/br/deflate 实时解码、二进制可下载、截断有标记。">
+              Line-numbered JSON tree, form field tables, inline image previews, gzip/br/deflate decoded on the fly,
+              binary downloadable, truncation flagged.
+            </p>
+          </article>
+          <article class="card">
+            <div class="ic">⎙</div>
+            <h3 data-en="HAR export &amp; cURL" data-zh="HAR 导出与 cURL">HAR export &amp; cURL</h3>
+            <p data-en="Export one flow or everything as HAR 1.2 with decoded bodies; copy any request as a cURL command. Pause and clear capture without losing live streams." data-zh="单个或全部导出为 HAR 1.2（含解码后的载荷）；任意请求一键复制成 cURL。暂停/清空捕获而不干掉还活着的流。">
+              Export one flow or everything as HAR 1.2 with decoded bodies; copy any request as a cURL command. Pause
+              and clear capture without losing live streams.
+            </p>
+          </article>
+        </div>
+      </section>
+
+      <!-- ───────────────────────── screenshots ───────────────────────── -->
+      <section id="screens" class="section alt">
+        <h2 class="section-title"><span data-en="A look at the UI" data-zh="界面一览">A look at the UI</span></h2>
+        <p class="section-sub" data-en="Light theme by default, English or Chinese." data-zh="默认亮色主题，支持 English / 简体中文。">Light theme by default, English or Chinese.</p>
+        <div class="shots">
+          <figure><img src="../ui-overview.png" alt="flow list and overview" loading="lazy" /><figcaption data-en="Live flow list + overview" data-zh="实时流量列表 + 概览">Live flow list + overview</figcaption></figure>
+          <figure><img src="../ui-sse.png" alt="SSE frames" loading="lazy" /><figcaption data-en="SSE — every event individually" data-zh="SSE —— 每个事件单独呈现">SSE — every event individually</figcaption></figure>
+          <figure><img src="../ui-ws.png" alt="WebSocket frames" loading="lazy" /><figcaption data-en="WebSocket — both directions" data-zh="WebSocket —— 双向交织">WebSocket — both directions</figcaption></figure>
+          <figure><img src="../ui-response.png" alt="response body" loading="lazy" /><figcaption data-en="Response — JSON tree &amp; headers" data-zh="响应 —— JSON 树与响应头">Response — JSON tree &amp; headers</figcaption></figure>
+          <figure><img src="../ui-replay.png" alt="replay composer" loading="lazy" /><figcaption data-en="Replay — Postman-style composer" data-zh="重放 —— Postman 风格编辑器">Replay — Postman-style composer</figcaption></figure>
+          <figure><img src="../ui-trust.png" alt="trust instructions" loading="lazy" /><figcaption data-en="Trust the CA, per platform" data-zh="逐平台信任 CA">Trust the CA, per platform</figcaption></figure>
+        </div>
+      </section>
+
+      <!-- ───────────────────────── install ───────────────────────── -->
+      <section id="install" class="section">
+        <h2 class="section-title"><span data-en="Get started in seconds" data-zh="几秒即可上手">Get started in seconds</span></h2>
+        <p class="section-sub" data-en="Prebuilt binaries for every platform, static Linux builds, Docker, or build from source." data-zh="全平台预编译二进制、静态 Linux 构建、Docker，或从源码构建。">
+          Prebuilt binaries for every platform, static Linux builds, Docker, or build from source.
+        </p>
+
+        <div class="tabsbar" role="tablist">
+          <button class="tab is-active" data-tab="bin" type="button"><span data-en="Binary" data-zh="二进制">Binary</span></button>
+          <button class="tab" data-tab="docker" type="button">Docker</button>
+          <button class="tab" data-tab="cargo" type="button">Cargo</button>
+        </div>
+
+        <div class="panel is-active" data-panel="bin">
+          <div class="codehead"><span data-en="Linux x64 (static) — also deb / rpm on Releases" data-zh="Linux x64（静态）—— Releases 里还有 deb / rpm">Linux x64 (static) — also deb / rpm on Releases</span><button class="copy" data-copy="curl -LO https://github.com/xiegoudan/proxyhand/releases/latest/download/proxyhand-amd64-linux
+chmod +x proxyhand-amd64-linux
+sudo mv proxyhand-amd64-linux /usr/local/bin/proxyhand" data-en="Copy" data-zh="复制">Copy</button></div>
+          <pre><code>curl -LO https://github.com/xiegoudan/proxyhand/releases/latest/download/<span class="c-key">proxyhand-amd64-linux</span>
+chmod +x proxyhand-amd64-linux
+sudo mv proxyhand-amd64-linux /usr/local/bin/proxyhand</code></pre>
+          <p class="hint" data-en="Prebuilt assets: proxyhand-amd64|arm64-linux · .exe for Windows x64 / ARM · .deb · .rpm · macOS (Intel &amp; Apple silicon). Linux builds are static — they run on Alpine too."
+            data-zh="预编译产物：proxyhand-amd64|arm64-linux · Windows x64 / ARM 的 .exe · .deb · .rpm · macOS（Intel 与 Apple 芯片）。Linux 构建是静态的，Alpine 也能跑。">
+            Prebuilt assets: proxyhand-amd64|arm64-linux · .exe for Windows x64 / ARM · .deb · .rpm · macOS (Intel &amp; Apple
+            silicon). Linux builds are static — they run on Alpine too.
+          </p>
+        </div>
+
+        <div class="panel" data-panel="docker">
+          <div class="codehead"><span data-en="Docker Hub — linux/amd64 &amp; linux/arm64" data-zh="Docker Hub —— linux/amd64 与 linux/arm64">Docker Hub — linux/amd64 &amp; linux/arm64</span><button class="copy" data-copy="docker run --rm -p 8899:7747 -v proxyhand_data:/data xiegoudan/proxyhand:latest" data-en="Copy" data-zh="复制">Copy</button></div>
+          <pre><code>docker run --rm -p <span class="c-key">8899:7747</span> -v proxyhand_data:/data xiegoudan/proxyhand:latest</code></pre>
+          <p class="hint" data-en="The container listens on 7747; publish any host port. The root CA lives on the volume, so trusted clients keep working across upgrades."
+            data-zh="容器监听 7747；宿主端口随意映射。根 CA 存在卷里，升级后已信任它的客户端继续可用。">
+            The container listens on 7747; publish any host port. The root CA lives on the volume, so trusted clients
+            keep working across upgrades.
+          </p>
+        </div>
+
+        <div class="panel" data-panel="cargo">
+          <div class="codehead"><span data-en="Build from source (Rust)" data-zh="从源码构建（Rust）">Build from source (Rust)</span><button class="copy" data-copy="cargo install --git https://github.com/xiegoudan/proxyhand
+proxyhand" data-en="Copy" data-zh="复制">Copy</button></div>
+          <pre><code>cargo install --git https://github.com/xiegoudan/proxyhand
+<span class="c-key">proxyhand</span>   <span class="c-dim"># proxy + UI on http://127.0.0.1:7747</span></code></pre>
+          <p class="hint" data-en="The web UI is embedded in the binary, so there is nothing else to run." data-zh="Web UI 已嵌入二进制，无需另外启动任何东西。">
+            The web UI is embedded in the binary, so there is nothing else to run.
+          </p>
+        </div>
+
+        <div class="trustline">
+          <span class="trustline-ic">🔒</span>
+          <span data-en="For HTTPS, install the root CA once: certutil -addstore -f &quot;ROOT&quot; ca.crt (Windows) · update-ca-certificates (Debian) · the shield button in the UI has the full table."
+            data-zh="抓 HTTPS 需先安装一次根 CA：certutil -addstore -f &quot;ROOT&quot; ca.crt（Windows）· update-ca-certificates（Debian）· UI 里的盾牌按钮有完整清单。">
+            For HTTPS, install the root CA once: <code>certutil -addstore -f "ROOT" ca.crt</code> (Windows) ·
+            <code>update-ca-certificates</code> (Debian) · the shield button in the UI has the full table.
+          </span>
+        </div>
+      </section>
+
+      <!-- ───────────────────────── footer ───────────────────────── -->
+      <footer class="footer">
+        <div class="foot-brand">
+          <span class="brand-mark small" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9h13l-3-3"/><path d="M20 15H7l3 3"/></svg>
+          </span>
+          <span>proxyhand</span>
+        </div>
+        <nav class="foot-nav">
+          <a href="https://github.com/xiegoudan/proxyhand" target="_blank" rel="noopener">GitHub</a>
+          <a href="https://github.com/xiegoudan/proxyhand/releases/latest" target="_blank" rel="noopener">Releases</a>
+          <a href="https://hub.docker.com/r/xiegoudan/proxyhand" target="_blank" rel="noopener">Docker Hub</a>
+          <a href="https://github.com/xiegoudan/proxyhand/blob/main/README.md" target="_blank" rel="noopener">Docs</a>
+          <a href="https://github.com/xiegoudan/proxyhand/blob/main/LICENSE" target="_blank" rel="noopener">Apache-2.0</a>
+        </nav>
+        <p class="foot-note" data-en="A debugging tool that performs TLS interception — bind it to localhost and remove the CA when you're done." data-zh="这是一个会做 TLS 拦截的调试工具 —— 绑定在 localhost，用完记得移除 CA。">
+          A debugging tool that performs TLS interception — bind it to localhost and remove the CA when you're done.
+        </p>
+      </footer>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

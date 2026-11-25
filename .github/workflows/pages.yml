@@ -1,0 +1,51 @@
+name: pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/site/**'
+      - 'docs/*.png'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+# Allow the workflow to publish to Pages.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; let a newer push supersede a queued one.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: build & deploy site
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # The landing page lives in docs/site/ and references the shared screenshots in
+      # docs/ as ../ui-*.png (so it previews correctly from the repo). For the publish
+      # dir we flatten both together and rewrite ../ to ./.
+      - name: Assemble publish directory
+        run: |
+          mkdir -p _site
+          cp -r docs/site/. _site/
+          cp docs/*.png _site/
+          sed -i 's#src="\.\./ui-#src="./ui-#g' _site/index.html
+          ls -la _site
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
