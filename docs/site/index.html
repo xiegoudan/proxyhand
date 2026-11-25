@@ -3,19 +3,66 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>proxyhand — HTTP/HTTPS/SSE/WebSocket interception proxy</title>
+    <title>proxyhand — HTTP/HTTPS/SSE/WebSocket interception proxy (one Rust binary)</title>
     <meta
       name="description"
-      content="A single-binary HTTP/HTTPS/SSE/WebSocket interception proxy with a built-in web UI. Written in Rust. Live SSE events and WebSocket frames, replay, HAR export."
+      content="proxyhand is a single-binary HTTP, HTTPS, SSE and WebSocket interception proxy with a built-in web UI. Written in Rust: certificates minted on the fly, live SSE events and WebSocket frames, one-click replay, HAR export. Linux, macOS, Windows and Docker."
     />
-    <meta property="og:title" content="proxyhand" />
+    <meta name="keywords" content="interception proxy, HTTP proxy, HTTPS proxy, MITM proxy, SSE inspector, WebSocket debugger, packet capture, Charles proxy alternative, whistle alternative, mitmproxy alternative, Rust proxy, HAR export, tls interception" />
+    <meta name="author" content="xiegoudan" />
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="theme-color" content="#0b0a10" />
+    <meta name="color-scheme" content="dark light" />
+    <link rel="canonical" href="https://xiegoudan.github.io/proxyhand/" />
+
+    <!-- Open Graph -->
+    <meta property="og:site_name" content="proxyhand" />
+    <meta property="og:title" content="proxyhand — HTTP/HTTPS/SSE/WebSocket interception proxy" />
     <meta
       property="og:description"
-      content="One binary, one port for http:// and https://, certificates on the fly, and a live inspector for SSE and WebSocket."
+      content="One binary, one port for http:// and https://, certificates minted on the fly, and a live inspector for SSE and WebSocket — instead of a buffered blob."
     />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://xiegoudan.github.io/proxyhand/" />
+    <meta property="og:image" content="https://xiegoudan.github.io/proxyhand/shots/overview-1280.jpg" />
+    <meta property="og:image:width" content="1280" />
+    <meta property="og:image:height" content="800" />
+    <meta property="og:image:alt" content="proxyhand web UI showing a live flow list alongside a request detail pane" />
+    <meta property="og:locale" content="en_US" />
+    <meta property="og:locale:alternate" content="zh_CN" />
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="proxyhand — HTTP/HTTPS/SSE/WebSocket interception proxy" />
+    <meta name="twitter:description" content="A single-binary interception proxy in Rust with a built-in live web UI for HTTP, HTTPS, SSE and WebSocket." />
+    <meta name="twitter:image" content="https://xiegoudan.github.io/proxyhand/shots/overview-1280.jpg" />
+
     <link rel="icon" href="favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="favicon.svg" />
     <link rel="stylesheet" href="style.css" />
+
+    <!-- Structured data: SoftwareApplication + source repo -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "proxyhand",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Linux, macOS, Windows, Docker",
+        "description": "A single-binary HTTP/HTTPS/SSE/WebSocket interception proxy with a built-in web UI, written in Rust.",
+        "url": "https://xiegoudan.github.io/proxyhand/",
+        "downloadUrl": "https://github.com/xiegoudan/proxyhand/releases/latest",
+        "softwareVersion": "0.1.14",
+        "license": "https://github.com/xiegoudan/proxyhand/blob/main/LICENSE",
+        "programmingLanguage": "Rust",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "sameAs": [
+          "https://github.com/xiegoudan/proxyhand",
+          "https://hub.docker.com/r/xiegoudan/proxyhand"
+        ],
+        "screenshot": "https://xiegoudan.github.io/proxyhand/shots/overview-1280.jpg"
+      }
+    </script>
   </head>
   <body>
     <!-- ───────────────────────── header ───────────────────────── -->
@@ -145,12 +192,48 @@
         <h2 class="section-title"><span data-en="A look at the UI" data-zh="界面一览">A look at the UI</span></h2>
         <p class="section-sub" data-en="Light theme by default, English or Chinese." data-zh="默认亮色主题，支持 English / 简体中文。">Light theme by default, English or Chinese.</p>
         <div class="shots">
-          <figure><img src="../ui-overview.png" alt="flow list and overview" loading="lazy" /><figcaption data-en="Live flow list + overview" data-zh="实时流量列表 + 概览">Live flow list + overview</figcaption></figure>
-          <figure><img src="../ui-sse.png" alt="SSE frames" loading="lazy" /><figcaption data-en="SSE — every event individually" data-zh="SSE —— 每个事件单独呈现">SSE — every event individually</figcaption></figure>
-          <figure><img src="../ui-ws.png" alt="WebSocket frames" loading="lazy" /><figcaption data-en="WebSocket — both directions" data-zh="WebSocket —— 双向交织">WebSocket — both directions</figcaption></figure>
-          <figure><img src="../ui-response.png" alt="response body" loading="lazy" /><figcaption data-en="Response — JSON tree &amp; headers" data-zh="响应 —— JSON 树与响应头">Response — JSON tree &amp; headers</figcaption></figure>
-          <figure><img src="../ui-replay.png" alt="replay composer" loading="lazy" /><figcaption data-en="Replay — Postman-style composer" data-zh="重放 —— Postman 风格编辑器">Replay — Postman-style composer</figcaption></figure>
-          <figure><img src="../ui-trust.png" alt="trust instructions" loading="lazy" /><figcaption data-en="Trust the CA, per platform" data-zh="逐平台信任 CA">Trust the CA, per platform</figcaption></figure>
+          <figure>
+            <picture>
+              <source type="image/jpeg" srcset="./shots/overview-640.jpg 640w, ./shots/overview-1280.jpg 1280w" sizes="(max-width: 700px) 100vw, 540px" />
+              <img src="./shots/overview-640.jpg" width="1280" height="800" alt="proxyhand flow list showing HTTP, SSE and WebSocket requests with method, status, size and duration, next to a detail pane" loading="lazy" decoding="async" />
+            </picture>
+            <figcaption data-en="Live flow list + overview" data-zh="实时流量列表 + 概览">Live flow list + overview</figcaption>
+          </figure>
+          <figure>
+            <picture>
+              <source type="image/jpeg" srcset="./shots/sse-640.jpg 640w, ./shots/sse-1280.jpg 1280w" sizes="(max-width: 700px) 100vw, 540px" />
+              <img src="./shots/sse-640.jpg" width="1280" height="800" alt="Server-Sent Events inspector: each event shown separately with event name, id, retry, byte size and a JSON payload tree" loading="lazy" decoding="async" />
+            </picture>
+            <figcaption data-en="SSE — every event individually" data-zh="SSE —— 每个事件单独呈现">SSE — every event individually</figcaption>
+          </figure>
+          <figure>
+            <picture>
+              <source type="image/jpeg" srcset="./shots/ws-640.jpg 640w, ./shots/ws-1280.jpg 1280w" sizes="(max-width: 700px) 100vw, 540px" />
+              <img src="./shots/ws-640.jpg" width="1280" height="800" alt="WebSocket frame inspector with both directions interleaved, opacity (text/binary/ping/pong) and JSON payloads" loading="lazy" decoding="async" />
+            </picture>
+            <figcaption data-en="WebSocket — both directions" data-zh="WebSocket —— 双向交织">WebSocket — both directions</figcaption>
+          </figure>
+          <figure>
+            <picture>
+              <source type="image/jpeg" srcset="./shots/response-640.jpg 640w, ./shots/response-1280.jpg 1280w" sizes="(max-width: 700px) 100vw, 540px" />
+              <img src="./shots/response-640.jpg" width="1280" height="800" alt="Response view with response headers and a collapsible, syntax-highlighted JSON tree body" loading="lazy" decoding="async" />
+            </picture>
+            <figcaption data-en="Response — JSON tree &amp; headers" data-zh="响应 —— JSON 树与响应头">Response — JSON tree &amp; headers</figcaption>
+          </figure>
+          <figure>
+            <picture>
+              <source type="image/jpeg" srcset="./shots/replay-640.jpg 640w, ./shots/replay-1280.jpg 1280w" sizes="(max-width: 700px) 100vw, 540px" />
+              <img src="./shots/replay-640.jpg" width="1280" height="800" alt="Replay composer dialog in the style of Postman: editable method, URL, headers and a formatted JSON body" loading="lazy" decoding="async" />
+            </picture>
+            <figcaption data-en="Replay — Postman-style composer" data-zh="重放 —— Postman 风格编辑器">Replay — Postman-style composer</figcaption>
+          </figure>
+          <figure>
+            <picture>
+              <source type="image/jpeg" srcset="./shots/trust-640.jpg 640w, ./shots/trust-1280.jpg 1280w" sizes="(max-width: 700px) 100vw, 540px" />
+              <img src="./shots/trust-640.jpg" width="1280" height="800" alt="Trust instructions dialog listing per-platform commands to install the proxyhand root CA" loading="lazy" decoding="async" />
+            </picture>
+            <figcaption data-en="Trust the CA, per platform" data-zh="逐平台信任 CA">Trust the CA, per platform</figcaption>
+          </figure>
         </div>
       </section>
 

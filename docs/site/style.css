@@ -236,18 +236,25 @@ code, pre { font-family: var(--mono); }
 .shots {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 18px;
+  gap: 22px 18px;
   margin-top: 44px;
 }
 .shots figure { margin: 0; }
+.shots picture { display: block; }
 .shots img {
   width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
   display: block;
   border-radius: 10px;
   border: 1px solid var(--border-2);
   box-shadow: 0 24px 60px -34px rgba(0, 0, 0, 0.9);
   background: #fff;
+  transition: transform 0.2s, box-shadow 0.2s;
 }
+.shots a:hover img,
+.shots figure:hover img { transform: translateY(-2px); box-shadow: 0 30px 70px -34px rgba(139, 92, 246, 0.55); }
 .shots figcaption { text-align: center; color: var(--muted); font-size: 13px; margin-top: 10px; }
 
 /* ── install tabs ────────────────────────────────────────── */
